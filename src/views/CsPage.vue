@@ -2,7 +2,9 @@
 <template>
   <div class="p-6">
     <!-- Role and name disini -->
-    <h1 class="text-2xl font-bold mb-4">{{ userName }} - {{ userRole }}</h1>
+    <h1 class="text-2xl font-bold mb-4">
+      {{ userName }} - {{ userRole }} - {{ userCabang }}
+    </h1>
 
     <div class="mb-4 flex items-center gap-2">
       <button
@@ -69,6 +71,7 @@ const API_BASE = import.meta.env.VITE_API_BASE;
 const auth = useAuthStore();
 const userName = computed(() => auth.user?.name ?? "-");
 const userRole = computed(() => auth.role ?? "-");
+const userCabang = computed(() => auth.user?.cabang ?? "-");
 const handovers = ref([]);
 const totalHandOver = ref(0);
 
