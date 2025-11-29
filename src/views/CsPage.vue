@@ -63,7 +63,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import axios from "axios";
 let intervalId = null;
 
-const API_BASE = "http://ozzy-wh.test/api"; // sesuaikan
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 const handovers = ref([]);
 const totalHandOver = ref(0);

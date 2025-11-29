@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import axios from "axios";
 import router from "@/router";
 
-const API_BASE = "http://ozzy-wh.test/api"; // GANTI sesuai URL Laravel kamu
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export const useAuthStore = defineStore("auth", {
   /*************  ✨ Windsurf Command ⭐  *************/
