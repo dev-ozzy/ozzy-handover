@@ -21,6 +21,18 @@
             class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
           />
         </div>
+        <!-- Remember me -->
+        <div class="mb-4 flex items-center">
+          <input
+            id="remember-me"
+            name="remember-me"
+            type="checkbox"
+            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label for="remember-me" class="ml-2 block text-sm text-gray-900"
+            >Ingat saya</label
+          >
+        </div>
 
         <button
           type="submit"
@@ -44,6 +56,7 @@ import { useRouter } from "vue-router";
 
 const email = ref("");
 const password = ref("");
+const rememberMe = ref(false);
 const error = ref("");
 const auth = useAuthStore();
 const router = useRouter();
@@ -51,7 +64,11 @@ const router = useRouter();
 const submit = async () => {
   error.value = "";
   try {
-    await auth.login({ email: email.value, password: password.value });
+    await auth.login({
+      email: email.value,
+      password: password.value,
+      rememberMe: rememberMe.value,
+    });
 
     // redirect sesuai role
     if (auth.role === "Deal Maker") {
