@@ -1,7 +1,8 @@
 <!-- src/views/DealMakerPage.vue -->
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold mb-4">Deal Maker Hand Over</h1>
+    <!-- Role and name disini -->
+    <h1 class="text-2xl font-bold mb-4">{{ userName }} - {{ userRole }}</h1>
 
     <div class="mb-4 flex items-center gap-2">
       <button
@@ -61,10 +62,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import axios from "axios";
+import { useAuthStore } from "@/stores/auth";
 let intervalId = null;
 
 const API_BASE = import.meta.env.VITE_API_BASE;
-
+const auth = useAuthStore();
+const userName = computed(() => auth.user?.name ?? "-");
+const userRole = computed(() => auth.role ?? "-");
 const handovers = ref([]);
 const totalHandOver = ref(0);
 

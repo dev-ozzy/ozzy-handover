@@ -62,7 +62,7 @@ router.beforeEach((to, from, next) => {
     if (auth.role === "Deal Maker") {
       return next({ name: "deal-maker" });
     }
-    if (auth.role === "CS Back End") {
+    if (auth.role === "CS Back End" || auth.role === "SPV Deal Maker") {
       return next({ name: "cs-be" });
     }
   }

@@ -4,20 +4,73 @@ import router from "@/router";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
+function loadUserFromStorage() {
+  try {
+    const raw = localStorage.getItem("user");
+
+    // kalau belum pernah diset
+    if (!raw || raw === "undefined" || raw === "null") {
+      return null;
+    }
+
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn("Gagal parse user dari localStorage, di-reset:", e);
+    localStorage.removeItem("user");
+    return null;
+  }
+}
+
+function loadTokenFromStorage() {
+  const raw = localStorage.getItem("token");
+  if (!raw || raw === "undefined" || raw === "null") {
+    return null;
+  }
+  return raw;
+}
+
 export const useAuthStore = defineStore("auth", {
-  /*************  ✨ Windsurf Command ⭐  *************/
-  /*******  d2965b27-c6f5-40dd-979a-ef2f221a4c6f  *******/
   state: () => ({
-    user: JSON.parse(localStorage.getItem("user")) || null,
-    token: localStorage.getItem("token") || null,
+    user: loadUserFromStorage(),
+    token: loadTokenFromStorage(),
   }),
 
   getters: {
     isLoggedIn: (state) => !!state.token,
-    role: (state) => state.user?.role || null,
+    role: (state) => {
+      const user = state.user;
+      if (!user) return null;
+
+      if (user.role) return user.role;
+
+      if (Array.isArray(user.roles) && user.roles.length > 0) {
+        const first = user.roles[0];
+        return typeof first === "string" ? first : first.name;
+      }
+
+      if (Array.isArray(user.role_names) && user.role_names.length > 0) {
+        return user.role_names[0];
+      }
+
+      return null;
+    },
   },
 
   actions: {
+    setAuthHeader() {
+      if (this.token) {
+        axios.defaults.headers.common["Authorization"] = `Bearer ${this.token}`;
+      } else {
+        delete axios.defaults.headers.common["Authorization"];
+      }
+    },
+
+    initFromStorage() {
+      if (this.token) {
+        this.setAuthHeader();
+      }
+    },
+
     async login(credentials) {
       const res = await axios.post(`${API_BASE}/login`, credentials);
 
@@ -27,20 +80,20 @@ export const useAuthStore = defineStore("auth", {
       localStorage.setItem("token", this.token);
       localStorage.setItem("user", JSON.stringify(this.user));
 
-      axios.defaults.headers.common["Authorization"] = `Bearer ${this.token}`;
+      this.setAuthHeader();
     },
 
     async fetchUser() {
       if (!this.token) return;
 
       try {
-        axios.defaults.headers.common["Authorization"] = `Bearer ${this.token}`;
+        this.setAuthHeader();
         const res = await axios.get(`${API_BASE}/me`);
-        this.user = res.data;
+        // console.log(res.user);
 
+        this.user = res.data.user;
         localStorage.setItem("user", JSON.stringify(this.user));
       } catch (error) {
-        // cuma logout kalau bener-bener 401 (token invalid / expired)
         if (error.response && error.response.status === 401) {
           this.logout();
         } else {
@@ -56,7 +109,7 @@ export const useAuthStore = defineStore("auth", {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
 
-      delete axios.defaults.headers.common["Authorization"];
+      this.setAuthHeader();
       router.push({ name: "login" });
     },
   },

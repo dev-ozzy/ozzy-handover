@@ -1,7 +1,7 @@
 <!-- src/views/CsBackEndPage.vue -->
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold mb-4">CS Back End Hand Over</h1>
+    <h1 class="text-2xl font-bold mb-4">{{ userName }} - {{ userRole }}</h1>
 
     <table class="w-full text-sm border">
       <thead class="bg-gray-100">
@@ -47,9 +47,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 let intervalId = null;
+import { useAuthStore } from "@/stores/auth";
+const auth = useAuthStore();
 
+const userName = computed(() => auth.user?.name ?? "-");
+const userRole = computed(() => auth.role ?? "-");
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE;

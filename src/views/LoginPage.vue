@@ -56,7 +56,7 @@ const submit = async () => {
     // redirect sesuai role
     if (auth.role === "Deal Maker") {
       router.push({ name: "deal-maker" });
-    } else if (auth.role === "CS Back End") {
+    } else if (auth.role === "CS Back End" || auth.role === "SPV Deal Maker") {
       router.push({ name: "cs-be" });
     } else {
       router.push({ name: "login" });
