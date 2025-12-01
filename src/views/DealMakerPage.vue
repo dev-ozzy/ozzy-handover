@@ -37,8 +37,10 @@
         <tr>
           <th class="border px-2 py-1">Tanggal</th>
           <th class="border px-2 py-1">Mulai</th>
+          <th class="border px-2 py-1">Waktu Handover</th>
           <th class="border px-2 py-1">Selesai</th>
-          <th class="border px-2 py-1">Total</th>
+          <th class="border px-2 py-1">Kecepatan Handover</th>
+          <th class="border px-2 py-1">Total Handover</th>
           <th class="border px-2 py-1">CS Back End</th>
           <th class="border px-2 py-1">Cabang</th>
           <th class="border px-2 py-1">Status</th>
@@ -48,7 +50,9 @@
         <tr v-for="h in handovers" :key="h.id">
           <td class="border px-2 py-1">{{ h.tanggal }}</td>
           <td class="border px-2 py-1">{{ h.waktu_mulai }}</td>
+          <td class="border px-2 py-1">{{ h.waktu_handover ?? "-" }}</td>
           <td class="border px-2 py-1">{{ h.waktu_selesai ?? "-" }}</td>
+          <td class="border px-2 py-1">{{ h.kecepatan_handover ?? "-" }}</td>
           <td class="border px-2 py-1">{{ h.total_hand_over ?? "-" }}</td>
           <td class="border px-2 py-1">
             {{ h.cs_back_end?.name ?? "-" }}
