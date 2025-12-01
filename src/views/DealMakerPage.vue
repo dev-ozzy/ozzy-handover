@@ -88,7 +88,7 @@ const loadHandovers = async () => {
 
 const startHandover = async () => {
   const res = await axios.post(`${API_BASE}/handovers/start`);
-  handovers.value.unshift(res.data);
+  // handovers.value.unshift(res.data);
 };
 
 const finishHandover = async () => {

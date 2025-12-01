@@ -3,8 +3,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 
 import LoginPage from "@/views/LoginPage.vue";
-import DealMakerPage from "@/views/CsPage.vue";
-import CsBackEndPage from "@/views/BePage.vue";
+import DealMakerPage from "@/views/DealMakerPage.vue";
+import CsBackEndPage from "@/views/CsBackEndPage.vue";
 
 const routes = [
   {
