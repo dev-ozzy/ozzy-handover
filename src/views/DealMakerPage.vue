@@ -108,26 +108,42 @@
 
                 <!-- Tombol Pilihan -->
                 <div class="flex flex-col space-y-3">
+                  <!-- Istirahat -->
                   <button
                     type="button"
-                    class="w-full rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    class="w-full rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     @click="startHandover('Istirahat')"
+                    :disabled="loadingHandover"
                   >
-                    Istirahat
+                    <span
+                      v-if="loadingHandover && alasanDipilih === 'Istirahat'"
+                    >
+                      Mengirim...
+                    </span>
+                    <span v-else> Istirahat </span>
                   </button>
 
+                  <!-- Konsumen -->
                   <button
                     type="button"
-                    class="w-full rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    class="w-full rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     @click="startHandover('Konsumen')"
+                    :disabled="loadingHandover"
                   >
-                    Konsumen
+                    <span
+                      v-if="loadingHandover && alasanDipilih === 'Konsumen'"
+                    >
+                      Mengirim...
+                    </span>
+                    <span v-else> Konsumen </span>
                   </button>
+
                   <!-- Cancel -->
                   <button
                     type="button"
                     class="w-full rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                     @click="open = false"
+                    :disabled="loadingHandover"
                   >
                     Cancel
                   </button>
@@ -181,16 +197,29 @@ const openAlasanModal = () => {
   open.value = true;
 };
 
+const loadingHandover = ref(false);
+const alasanDipilih = ref(null);
+
 const startHandover = async (alasan) => {
-  const res = await axios.post(`${API_BASE}/handovers/start`, {
-    alasan: alasan,
-  });
+  loadingHandover.value = true;
+  alasanDipilih.value = alasan;
 
-  if (res.data) {
-    open.value = false;
+  try {
+    const res = await axios.post(`${API_BASE}/handovers/start`, {
+      alasan,
+    });
+
+    if (res.data) {
+      open.value = false; // tutup modal
+      // handovers.value.unshift(res.data);
+    }
+  } catch (e) {
+    console.error(e);
+    // optional: tampilkan toast/error
+  } finally {
+    loadingHandover.value = false;
+    alasanDipilih.value = null;
   }
-
-  // handovers.value.unshift(res.data);
 };
 
 const finishHandover = async () => {
