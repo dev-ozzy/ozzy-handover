@@ -27,6 +27,7 @@
             id="remember-me"
             name="remember-me"
             type="checkbox"
+            v-model="rememberMe"
             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
           />
           <label for="remember-me" class="ml-2 block text-sm text-gray-900"
@@ -67,7 +68,7 @@ const submit = async () => {
     await auth.login({
       email: email.value,
       password: password.value,
-      rememberMe: rememberMe.value,
+      remember: rememberMe.value,
     });
 
     // redirect sesuai role
