@@ -205,13 +205,13 @@ const startHandover = async (alasan) => {
   alasanDipilih.value = alasan;
 
   try {
+    open.value = false; // tutup modal
     const res = await axios.post(`${API_BASE}/handovers/start`, {
       alasan,
     });
 
     // if (res.data) {
-    open.value = false; // tutup modal
-    // handovers.value.unshift(res.data);
+    //   // handovers.value.unshift(res.data);
     // }
   } catch (e) {
     console.error(e);
