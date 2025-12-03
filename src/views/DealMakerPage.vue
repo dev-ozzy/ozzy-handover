@@ -209,10 +209,10 @@ const startHandover = async (alasan) => {
       alasan,
     });
 
-    if (res.data) {
-      open.value = false; // tutup modal
-      // handovers.value.unshift(res.data);
-    }
+    // if (res.data) {
+    open.value = false; // tutup modal
+    // handovers.value.unshift(res.data);
+    // }
   } catch (e) {
     console.error(e);
     // optional: tampilkan toast/error
