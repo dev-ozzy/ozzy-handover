@@ -32,38 +32,40 @@
     </div>
 
     <h2 class="font-semibold mb-2">Riwayat Handover</h2>
-    <table class="w-full text-sm border">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="border px-2 py-1">Tanggal</th>
-          <th class="border px-2 py-1">Mulai</th>
-          <th class="border px-2 py-1">Waktu Handover</th>
-          <th class="border px-2 py-1">Selesai</th>
-          <th class="border px-2 py-1">Kecepatan Handover</th>
-          <th class="border px-2 py-1">Total Handover</th>
-          <th class="border px-2 py-1">CS Back End</th>
-          <th class="border px-2 py-1">Cabang</th>
-          <th class="border px-2 py-1">Alasan</th>
-          <th class="border px-2 py-1">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="h in handovers" :key="h.id">
-          <td class="border px-2 py-1">{{ h.tanggal }}</td>
-          <td class="border px-2 py-1">{{ h.waktu_mulai }}</td>
-          <td class="border px-2 py-1">{{ h.waktu_handover ?? "-" }}</td>
-          <td class="border px-2 py-1">{{ h.waktu_selesai ?? "-" }}</td>
-          <td class="border px-2 py-1">{{ h.kecepatan_handover ?? "-" }}</td>
-          <td class="border px-2 py-1">{{ h.total_hand_over ?? "-" }}</td>
-          <td class="border px-2 py-1">
-            {{ h.cs_back_end?.name ?? "-" }}
-          </td>
-          <td class="border px-2 py-1">{{ h.cabang }}</td>
-          <td class="border px-2 py-1">{{ h.alasan ?? "-" }}</td>
-          <td class="border px-2 py-1">{{ h.status }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm border">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="border px-2 py-1">Tanggal</th>
+            <th class="border px-2 py-1">Mulai</th>
+            <th class="border px-2 py-1">Waktu Handover</th>
+            <th class="border px-2 py-1">Selesai</th>
+            <th class="border px-2 py-1">Kecepatan Handover</th>
+            <th class="border px-2 py-1">Total Handover</th>
+            <th class="border px-2 py-1">CS Back End</th>
+            <th class="border px-2 py-1">Cabang</th>
+            <th class="border px-2 py-1">Alasan</th>
+            <th class="border px-2 py-1">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="h in handovers" :key="h.id">
+            <td class="border px-2 py-1">{{ h.tanggal }}</td>
+            <td class="border px-2 py-1">{{ h.waktu_mulai }}</td>
+            <td class="border px-2 py-1">{{ h.waktu_handover ?? "-" }}</td>
+            <td class="border px-2 py-1">{{ h.waktu_selesai ?? "-" }}</td>
+            <td class="border px-2 py-1">{{ h.kecepatan_handover ?? "-" }}</td>
+            <td class="border px-2 py-1">{{ h.total_hand_over ?? "-" }}</td>
+            <td class="border px-2 py-1">
+              {{ h.cs_back_end?.name ?? "-" }}
+            </td>
+            <td class="border px-2 py-1">{{ h.cabang }}</td>
+            <td class="border px-2 py-1">{{ h.alasan ?? "-" }}</td>
+            <td class="border px-2 py-1">{{ h.status }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
   <TransitionRoot as="template" :show="open">
     <Dialog class="relative z-10" @close="open = false">

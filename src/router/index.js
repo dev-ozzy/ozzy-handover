@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/auth";
 import LoginPage from "@/views/LoginPage.vue";
 import DealMakerPage from "@/views/DealMakerPage.vue";
 import CsBackEndPage from "@/views/CsBackEndPage.vue";
+import LeadPage from "@/views/LeadPage.vue";
 
 const routes = [
   {
@@ -41,6 +42,12 @@ const routes = [
     path: "/cs-be",
     name: "cs-be",
     component: CsBackEndPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/lead",
+    name: "lead",
+    component: LeadPage,
     meta: { requiresAuth: true },
   },
 ];

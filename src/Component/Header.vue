@@ -4,16 +4,32 @@
       class="mx-auto flex max-w-7xl items-center justify-between p-4 lg:px-8"
       aria-label="Global"
     >
-      <div class="flex lg:flex-1 items-center gap-2">
+      <div class="flex lg:flex items-center gap-2 lg:mr-8">
         <a href="#" class="-m-1.5 p-1.5 flex items-center gap-2">
           <img class="h-8 w-auto" src="/logo-mail-sec.png" alt="Logo" />
           <span class="font-semibold text-gray-800 hidden sm:inline">
-            Ozzy Hand Over
+            CRM - Ozzy Clothing
           </span>
         </a>
       </div>
 
-      <div class="flex items-center gap-4">
+      <!-- Desktop Navigation -->
+      <div class="hidden lg:flex gap-x-6">
+        <router-link
+          v-for="item in navigation"
+          :key="item.name"
+          :to="item.href"
+          class="nav-item transition-colors"
+          :class="[
+            $route.path === item.href
+              ? 'text-blue-600 font-semibold border-b-2 border-blue-600'
+              : 'text-gray-700 hover:text-blue-600',
+          ]"
+          >{{ item.name }}</router-link
+        >
+      </div>
+
+      <div class="flex items-center gap-4 lg:ml-auto">
         <!-- Nama user (kalau login) -->
         <span
           v-if="isLoggedIn && user"
@@ -60,7 +76,9 @@
           <a href="#" class="-m-1.5 p-1.5 flex items-center gap-2">
             <!-- logo-mail-sec.png -->
             <img class="h-8 w-auto" src="/logo-mail-sec.png" alt="Logo" />
-            <span class="font-semibold text-gray-800"> Ozzy Hand Over </span>
+            <span class="font-semibold text-gray-800">
+              CRM - Ozzy Clothing
+            </span>
           </a>
           <button
             type="button"
@@ -70,6 +88,27 @@
             <span class="sr-only">Close menu</span>
             <XMarkIcon class="size-6" aria-hidden="true" />
           </button>
+        </div>
+
+        <div class="mt-6 flow-root">
+          <div class="-my-6 divide-y divide-gray-500/10">
+            <!-- Mobile Navigation -->
+            <div class="space-y-2 py-6">
+              <router-link
+                v-for="item in navigation"
+                :key="item.name"
+                :to="item.href"
+                @click="mobileMenuOpen = false"
+                class="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 transition-colors"
+                :class="[
+                  $route.path === item.href
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-900 hover:bg-gray-50',
+                ]"
+                >{{ item.name }}</router-link
+              >
+            </div>
+          </div>
         </div>
 
         <div class="mt-6">
@@ -101,7 +140,7 @@ import {
   SquaresPlusIcon,
   XMarkIcon,
 } from "@heroicons/vue/24/outline";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { storeToRefs } from "pinia";
@@ -115,6 +154,25 @@ const router = useRouter();
 
 // bikin ref reaktif dari store
 const { isLoggedIn, user } = storeToRefs(auth);
+
+const isDealMaker = () => auth.role === "Deal Maker";
+const isCsBackEnd = () => auth.role === "CS Back End";
+
+const navigation = computed(() => {
+  const items = [];
+
+  if (isDealMaker()) {
+    items.push({ name: "Handover DM", href: "/deal-maker" });
+  }
+
+  if (isCsBackEnd()) {
+    items.push({ name: "Handover BE", href: "/cs-be" });
+  }
+
+  items.push({ name: "Lead", href: "/lead" }); // assuming you have a lead route
+
+  return items;
+});
 
 // function logout yang rapi
 const handleLogout = () => {
