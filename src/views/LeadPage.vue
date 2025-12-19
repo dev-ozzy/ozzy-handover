@@ -901,10 +901,9 @@ const saveToAPI = async () => {
   };
 
   // ⏳ Delay 500ms sebelum tampil di list (smooth, tidak berkedip)
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // await new Promise((resolve) => setTimeout(resolve, 1000));
 
   // 🔹 Langsung tampil
-  leadsList.value.unshift(tempLead);
 
   formData.nomor_leads = "";
   formData.channelOnline = "";
@@ -920,6 +919,8 @@ const saveToAPI = async () => {
     });
 
     if (response.data.success) {
+      leadsList.value.unshift(tempLead);
+
       const real = response.data.data;
       const index = leadsList.value.findIndex((l) => l.id === tempLead.id);
 
