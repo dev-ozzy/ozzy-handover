@@ -16,6 +16,7 @@
       <!-- Desktop Navigation -->
       <div class="hidden lg:flex gap-x-6">
         <router-link
+          v-if="isLoggedIn && user"
           v-for="item in navigation"
           :key="item.name"
           :to="item.href"
