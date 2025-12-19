@@ -13,7 +13,9 @@
 
       <!-- Channel Online Section -->
       <div class="mb-8">
-        <h2 class="text-xl text-center font-bold text-gray-900 mb-4">CHANNEL ONLINE</h2>
+        <h2 class="text-xl text-center font-bold text-gray-900 mb-4">
+          CHANNEL ONLINE
+        </h2>
         <div class="grid grid-cols-5 gap-3">
           <button
             v-for="channel in channelsOnline"
@@ -148,11 +150,12 @@
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <TransitionGroup name="list" tag="tbody">
               <tr
-                v-for="(lead, index) in leadsList"
-                :key="index"
-                class="hover:bg-gray-50 border-b"
+                v-for="lead in leadsList"
+                :key="lead.id"
+                class="lead-item hover:bg-gray-50 border-b"
+                :data-optimistic="lead._optimistic"
               >
                 <td class="px-4 py-3 text-sm text-gray-700">
                   {{ lead.tanggal }}
@@ -189,12 +192,12 @@
                   {{ lead.nomor_leads }}
                 </td>
               </tr>
-              <tr v-if="leadsList.length === 0">
-                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+              <tr v-if="leadsList.length === 0" key="empty">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                   Belum ada data leads
                 </td>
               </tr>
-            </tbody>
+            </TransitionGroup>
           </table>
         </div>
       </div>
@@ -406,6 +409,102 @@
           </div>
         </div>
       </Dialog>
+    </TransitionRoot>
+    <!-- Toast Notification (Center Screen - SweetAlert Style) -->
+    <TransitionRoot :show="notification.show" as="template">
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <TransitionChild
+          as="template"
+          enter="ease-out duration-300"
+          enter-from="opacity-0"
+          enter-to="opacity-100"
+          leave="ease-in duration-200"
+          leave-from="opacity-100"
+          leave-to="opacity-0"
+        >
+          <div
+            class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          />
+        </TransitionChild>
+
+        <!-- Notification Card -->
+        <TransitionChild
+          as="template"
+          enter="ease-out duration-300"
+          enter-from="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+          enter-to="opacity-100 translate-y-0 sm:scale-100"
+          leave="ease-in duration-200"
+          leave-from="opacity-100 translate-y-0 sm:scale-100"
+          leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        >
+          <div
+            class="relative transform overflow-hidden rounded-lg bg-white shadow-xl transition-all sm:w-full sm:max-w-md"
+          >
+            <div class="bg-white px-4 pb-4 pt-5 sm:p-6">
+              <div class="text-center">
+                <!-- Icon -->
+                <div
+                  class="mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4"
+                  :class="
+                    notification.type === 'error'
+                      ? 'bg-red-100'
+                      : 'bg-green-100'
+                  "
+                >
+                  <!-- Success Icon -->
+                  <svg
+                    v-if="notification.type === 'success'"
+                    class="h-10 w-10 text-green-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <!-- Error Icon -->
+                  <svg
+                    v-else
+                    class="h-10 w-10 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+
+                <!-- Title -->
+                <h3
+                  :class="[
+                    'text-xl font-bold mb-2',
+                    notification.type === 'error'
+                      ? 'text-red-900'
+                      : 'text-green-900',
+                  ]"
+                >
+                  {{ notification.type === "error" ? "Error!" : "Berhasil!" }}
+                </h3>
+
+                <!-- Message -->
+                <p class="text-sm text-gray-600">
+                  {{ notification.message }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </TransitionChild>
+      </div>
     </TransitionRoot>
   </div>
 </template>
@@ -623,6 +722,7 @@ const clearErrors = () => {
 };
 
 // Validate Form
+// Validate Form
 const validateOnlineForm = () => {
   clearErrors();
   let isValid = true;
@@ -630,9 +730,31 @@ const validateOnlineForm = () => {
   if (!modalData.nomor_leads) {
     errors.nomor_leads = "No Leads harus diisi!";
     isValid = false;
-  } else if (!/^08\d{8,12}$/.test(modalData.nomor_leads)) {
-    errors.nomor_leads = "Format No Leads tidak valid (contoh: 08123456789)";
-    isValid = false;
+  } else {
+    // Normalize format: support +62, 62, atau 08
+    let normalized = modalData.nomor_leads.trim();
+
+    // Hapus spasi, dash, atau karakter non-digit kecuali +
+    normalized = normalized.replace(/[\s\-\(\)]/g, "");
+
+    // Validasi format
+    const isValidFormat = /^(\+?62|0)8\d{8,12}$/.test(normalized);
+
+    if (!isValidFormat) {
+      errors.nomor_leads =
+        "Format No Leads tidak valid (contoh: 08123456789 atau +6281234567890)";
+      isValid = false;
+    } else {
+      // Normalisasi ke format 08xxx
+      if (normalized.startsWith("+62")) {
+        normalized = "0" + normalized.slice(3);
+      } else if (normalized.startsWith("62")) {
+        normalized = "0" + normalized.slice(2);
+      }
+
+      // Update dengan format yang sudah dinormalisasi
+      modalData.nomor_leads = normalized;
+    }
   }
 
   if (!modalData.isOnlineOfficial) {
@@ -650,9 +772,31 @@ const validateOfflineForm = () => {
   if (!modalData.nomor_leads) {
     errors.nomor_leads = "No Leads harus diisi!";
     isValid = false;
-  } else if (!/^08\d{8,12}$/.test(modalData.nomor_leads)) {
-    errors.nomor_leads = "Format No Leads tidak valid (contoh: 08123456789)";
-    isValid = false;
+  } else {
+    // Normalize format: support +62, 62, atau 08
+    let normalized = modalData.nomor_leads.trim();
+
+    // Hapus spasi, dash, atau karakter non-digit kecuali +
+    normalized = normalized.replace(/[\s\-\(\)]/g, "");
+
+    // Validasi format
+    const isValidFormat = /^(\+?62|0)8\d{8,12}$/.test(normalized);
+
+    if (!isValidFormat) {
+      errors.nomor_leads =
+        "Format No Leads tidak valid (contoh: 08123456789 atau +6281234567890)";
+      isValid = false;
+    } else {
+      // Normalisasi ke format 08xxx
+      if (normalized.startsWith("+62")) {
+        normalized = "0" + normalized.slice(3);
+      } else if (normalized.startsWith("62")) {
+        normalized = "0" + normalized.slice(2);
+      }
+
+      // Update dengan format yang sudah dinormalisasi
+      modalData.nomor_leads = normalized;
+    }
   }
 
   return isValid;
@@ -722,10 +866,28 @@ const saveOfflineModal = () => {
   closeOfflineModal();
 };
 
+// Add notification state
+const notification = reactive({
+  show: false,
+  type: "success", // 'success' | 'error'
+  message: "",
+});
+
+// Show notification function
+const showNotification = (type, message) => {
+  notification.type = type;
+  notification.message = message;
+  notification.show = true;
+
+  // Auto hide after 4 seconds
+  setTimeout(() => {
+    notification.show = false;
+  }, 3000);
+};
+
 const saveToAPI = async () => {
   const now = new Date();
 
-  // 🔹 Optimistic data (sesuai struktur tabel)
   const tempLead = {
     id: `temp-${Date.now()}`,
     tanggal: now.toISOString().slice(0, 10),
@@ -738,10 +900,12 @@ const saveToAPI = async () => {
     _optimistic: true,
   };
 
+  // ⏳ Delay 500ms sebelum tampil di list (smooth, tidak berkedip)
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
   // 🔹 Langsung tampil
   leadsList.value.unshift(tempLead);
 
-  // 🔹 Reset form
   formData.nomor_leads = "";
   formData.channelOnline = "";
   formData.channelOffline = "";
@@ -757,7 +921,6 @@ const saveToAPI = async () => {
 
     if (response.data.success) {
       const real = response.data.data;
-
       const index = leadsList.value.findIndex((l) => l.id === tempLead.id);
 
       if (index !== -1) {
@@ -773,14 +936,43 @@ const saveToAPI = async () => {
           _optimistic: false,
         };
       }
+
+      showNotification("success", "Data leads berhasil disimpan!");
     }
   } catch (error) {
     console.error(error);
 
-    // 🔥 rollback
+    // Rollback
     leadsList.value = leadsList.value.filter((l) => l.id !== tempLead.id);
 
-    alert("Gagal menyimpan data");
+    let errorMessage = "Gagal menyimpan data";
+
+    if (error.response?.status === 409) {
+      errorMessage =
+        error.response.data.message || "Nomor leads sudah ditangani";
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.request) {
+      errorMessage = "Tidak dapat terhubung ke server";
+    }
+
+    showNotification("error", errorMessage);
   }
 };
 </script>
+
+<style scoped>
+.lead-item {
+  transition: all 0.2s ease;
+}
+
+/* Fade out saat dihapus */
+.v-leave-active {
+  transition: all 0.2s ease;
+}
+
+.v-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+</style>
