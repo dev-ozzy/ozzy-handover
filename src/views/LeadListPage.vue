@@ -15,20 +15,34 @@
         </div>
 
         <!-- Filters -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <!-- Deal Maker Filter -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <!-- Tanggal Awal Filter -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              Deal Maker ID
+              Tanggal Awal
             </label>
             <input
-              v-model="filters.deal_maker_id"
-              type="text"
-              placeholder="ID Deal Maker"
+              v-model="filters.tanggal_awal"
+              type="date"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               @input="debouncedFetch"
             />
           </div>
+
+          <!-- Tanggal Akhir Filter -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Tanggal Akhir
+            </label>
+            <input
+              v-model="filters.tanggal_akhir"
+              type="date"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              @input="debouncedFetch"
+            />
+          </div>
+
+          <!-- Deal Maker Filter -->
 
           <!-- Branch Filter -->
           <div>
@@ -86,21 +100,37 @@
           </div>
         </div>
 
-        <!-- Per Page Selection -->
-        <div class="mt-4 flex items-center gap-2">
-          <label class="text-sm font-medium text-gray-700">
-            Tampilkan per halaman:
-          </label>
-          <select
-            v-model="filters.per_page"
-            class="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            @change="fetchLeads"
-          >
-            <option :value="10">10</option>
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-            <option :value="100">100</option>
-          </select>
+        <div
+          class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mt-4"
+        >
+          <!-- KIRI: Per Page Selection -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-gray-700">
+              Tampilkan per halaman:
+            </label>
+            <select
+              v-model="filters.per_page"
+              class="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              @change="fetchLeads"
+            >
+              <option :value="10">10</option>
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+          </div>
+
+          <!-- KANAN: Deal Maker ID -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-gray-700"> Search : </label>
+            <input
+              v-model="filters.search"
+              type="text"
+              placeholder="Deal Maker / Leads"
+              class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              @input="debouncedFetch"
+            />
+          </div>
         </div>
       </div>
 
@@ -405,7 +435,7 @@ const selectedLead = ref(null);
 const isDeleting = ref(false);
 
 const filters = reactive({
-  deal_maker_id: "",
+  search: "",
   branch: "",
   channel: "",
   official: "",
@@ -443,7 +473,7 @@ const fetchLeads = async () => {
       per_page: filters.per_page,
     };
 
-    if (filters.deal_maker_id) params.deal_maker_id = filters.deal_maker_id;
+    if (filters.search) params.search = filters.search;
     if (filters.branch) params.branch = filters.branch;
     if (filters.channel) params.channel = filters.channel;
     if (filters.official) params.official = filters.official;
@@ -475,7 +505,7 @@ const debouncedFetch = () => {
 };
 
 const resetFilters = () => {
-  filters.deal_maker_id = "";
+  filters.search = "";
   filters.branch = "";
   filters.channel = "";
   filters.official = "";
