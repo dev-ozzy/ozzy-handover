@@ -6,6 +6,7 @@ import LoginPage from "@/views/LoginPage.vue";
 import DealMakerPage from "@/views/DealMakerPage.vue";
 import CsBackEndPage from "@/views/CsBackEndPage.vue";
 import LeadPage from "@/views/LeadPage.vue";
+import LeadListPage from "@/views/LeadListPage.vue";
 
 const routes = [
   {
@@ -19,6 +20,12 @@ const routes = [
           return { name: "deal-maker" };
         }
         if (auth.role === "CS Back End") {
+          return { name: "cs-be" };
+        }
+        if (auth.role === "SPV Deal Maker") {
+          return { name: "cs-be" };
+        }
+        if (auth.role === "Superadmin") {
           return { name: "cs-be" };
         }
       }
@@ -50,6 +57,12 @@ const routes = [
     component: LeadPage,
     meta: { requiresAuth: true },
   },
+  {
+    path: "/lead-list",
+    name: "lead-list",
+    component: LeadListPage,
+    meta: { requiresAuth: true },
+  },
 ];
 const router = createRouter({
   history: createWebHistory(),
@@ -71,6 +84,9 @@ router.beforeEach((to, from, next) => {
     }
     if (auth.role === "CS Back End" || auth.role === "SPV Deal Maker") {
       return next({ name: "cs-be" });
+    }
+    if (auth.role === "Superadmin") {
+      return next({ name: "lead-list" });
     }
   }
 

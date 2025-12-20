@@ -157,7 +157,7 @@
                 class="lead-item hover:bg-gray-50 border-b"
                 :data-optimistic="lead._optimistic"
               >
-                <td class="px-4 py-3 text-sm text-gray-700">
+                <td class="px-4 py-3 text-sm text-gray-700 nowrap">
                   {{ lead.tanggal }}
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-700">
@@ -708,7 +708,7 @@ onMounted(() => {
 // Fetch Leads
 const fetchLeads = async () => {
   try {
-    const response = await axios.get(`${API_BASE}/leads`);
+    const response = await axios.get(`${API_BASE}/leads-user`);
     leadsList.value = response.data;
   } catch (error) {
     console.error(error);
@@ -888,9 +888,11 @@ const showNotification = (type, message) => {
 const saveToAPI = async () => {
   const now = new Date();
 
+  // buat tanggal menjadi 19/12/2025
+
   const tempLead = {
     id: `temp-${Date.now()}`,
-    tanggal: now.toISOString().slice(0, 10),
+    tanggal: now.toLocaleDateString("id-ID"),
     waktu_leads: now.toTimeString().slice(0, 8),
     dealMaker: userName.value,
     cabang: userCabang.value,

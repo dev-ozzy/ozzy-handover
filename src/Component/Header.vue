@@ -158,11 +158,13 @@ const { isLoggedIn, user } = storeToRefs(auth);
 
 const isDealMaker = () => auth.role === "Deal Maker";
 const isCsBackEnd = () => auth.role === "CS Back End";
+const isSpvDealMaker = () => auth.role === "SPV Deal Maker";
+const isSuperadmin = () => auth.role === "Superadmin";
 
 const navigation = computed(() => {
   const items = [];
 
-  if (isDealMaker()) {
+  if (isDealMaker() || isSpvDealMaker()) {
     items.push({ name: "Handover DM", href: "/deal-maker" });
   }
 
@@ -170,7 +172,13 @@ const navigation = computed(() => {
     items.push({ name: "Handover BE", href: "/cs-be" });
   }
 
-  items.push({ name: "Lead", href: "/lead" }); // assuming you have a lead route
+  if (isCsBackEnd() || isDealMaker() || isSpvDealMaker()) {
+    items.push({ name: "Lead", href: "/lead" }); // assuming you have a lead route
+  }
+
+  if (isSuperadmin() || isSpvDealMaker()) {
+    items.push({ name: "Lead List", href: "/lead-list" }); // assuming you have a lead list route
+  }
 
   return items;
 });

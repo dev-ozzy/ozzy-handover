@@ -76,10 +76,14 @@ const submit = async () => {
       router.push({ name: "deal-maker" });
     } else if (auth.role === "CS Back End" || auth.role === "SPV Deal Maker") {
       router.push({ name: "cs-be" });
+    } else if (auth.role === "Superadmin") {
+      router.push({ name: "lead-list" });
     } else {
       router.push({ name: "login" });
       // eror value untuk menampilkan pesan error
       error.value = "Anda tidak memiliki role yang sesuai.";
+      // hapus token
+      auth.logout();
     }
   } catch (err) {
     error.value = "Login gagal, cek email / password.";
