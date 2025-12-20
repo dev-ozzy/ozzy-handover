@@ -435,6 +435,8 @@ const selectedLead = ref(null);
 const isDeleting = ref(false);
 
 const filters = reactive({
+  tanggal_akhir: "",
+  tanggal_awal: "",
   search: "",
   branch: "",
   channel: "",
@@ -472,8 +474,10 @@ const fetchLeads = async () => {
       page: filters.page,
       per_page: filters.per_page,
     };
-
+    if (filters.tanggal_akhir) params.tanggal_akhir = filters.tanggal_akhir;
+    if (filters.tanggal_awal) params.tanggal_awal = filters.tanggal_awal;
     if (filters.search) params.search = filters.search;
+
     if (filters.branch) params.branch = filters.branch;
     if (filters.channel) params.channel = filters.channel;
     if (filters.official) params.official = filters.official;
