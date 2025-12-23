@@ -42,45 +42,28 @@
             />
           </div>
 
-          <!-- Deal Maker Filter -->
-
-          <!-- Branch Filter -->
+          <!-- Branch Filter - Multi Select -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Cabang
-            </label>
-            <select
+            <MultiSelect
               v-model="filters.branch"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              :options="branchOptions"
+              label="Cabang"
+              placeholder="Pilih cabang..."
+              value-key="name"
+              display-key="name"
               @change="fetchLeads"
-            >
-              <option value="">Semua Cabang</option>
-              <option value="Jakarta">Jakarta</option>
-              <option value="Bandung">Bandung</option>
-              <option value="Surabaya">Surabaya</option>
-              <option value="Semarang">Semarang</option>
-              <option value="Yogyakarta">Yogyakarta</option>
-            </select>
+            />
           </div>
 
-          <!-- Channel Filter -->
+          <!-- Channel Filter - Multi Select -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Channel
-            </label>
-            <select
+            <MultiSelect
               v-model="filters.channel"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              :options="channelOptions"
+              label="Channel"
+              placeholder="Pilih channel..."
               @change="fetchLeads"
-            >
-              <option value="">Semua Channel</option>
-              <option value="Facebook">Facebook</option>
-              <option value="Website">Website</option>
-              <option value="Instagram">Instagram</option>
-              <option value="CTWA">CTWA</option>
-              <option value="ORGANIK">ORGANIK</option>
-              <option value="OUTLET">OUTLET</option>
-            </select>
+            />
           </div>
 
           <!-- Official Filter -->
@@ -120,7 +103,7 @@
             </select>
           </div>
 
-          <!-- KANAN: Deal Maker ID -->
+          <!-- KANAN: Search -->
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium text-gray-700"> Search : </label>
             <input
@@ -410,11 +393,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, computed } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import axios from "axios";
 import { TransitionRoot, TransitionChild } from "@headlessui/vue";
 import Pagination from "../Component/Pagination.vue";
 import DeleteConfirmationModal from "../Component/DeleteConfirmationModal.vue";
+import MultiSelect from "../Component/MultiSelect.vue";
 import { useAuthStore } from "@/stores/auth";
 
 const auth = useAuthStore();
@@ -427,6 +411,53 @@ const userRole = computed(() => auth.role ?? "-");
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
+// Branch Options - Sesuai data Anda
+const branchOptions = [
+  {
+    id: 2,
+    name: "OZZY CLOTHING INDONESIA",
+    address: "Jl Ki Penjawi no 3A",
+  },
+  {
+    id: 3,
+    name: "OZZY CLOTHING KABUPATEN",
+    address:
+      "Jl. Kabupaten No.Km 1.5, Trihanggo, Gamping\nYogyakarta\n0822 2001 4001",
+  },
+  {
+    id: 4,
+    name: "OZZY CLOTHING KLATEN",
+    address: "Jl Rajawali\nKlaten Tengah Jawa Tengah\n0813 7884 7884",
+  },
+  {
+    id: 5,
+    name: "OZZY CLOTHING MAGUWO",
+    address: "Ringroad Utara no 2A\nYogyakarta\n0878 9197 9191",
+  },
+  {
+    id: 6,
+    name: "OZZY CLOTHING WARUNGBOTO",
+    address:
+      "Ki Penjawi no 3B, Pandeyan, Umbulharjo\nKota Yogyakarta\n0821 7777 2724",
+  },
+  {
+    id: 7,
+    name: "OZZY CLOTHING SOLO",
+    address:
+      "Jl. A. Yani no. 348, Mendungan, Pabelan\nSukoharjo\n0822 4001 4007",
+  },
+];
+
+// Channel Options
+const channelOptions = [
+  "Facebook",
+  "Website",
+  "Instagram",
+  "CTWA",
+  "ORGANIK",
+  "OUTLET",
+];
+
 // State
 const loading = ref(false);
 const leadsList = ref([]);
@@ -438,8 +469,8 @@ const filters = reactive({
   tanggal_akhir: "",
   tanggal_awal: "",
   search: "",
-  branch: "",
-  channel: "",
+  branch: [], // Ubah jadi array untuk multi-select
+  channel: [], // Ubah jadi array untuk multi-select
   official: "",
   per_page: 10,
   page: 1,
@@ -474,13 +505,19 @@ const fetchLeads = async () => {
       page: filters.page,
       per_page: filters.per_page,
     };
-    if (filters.tanggal_akhir) params.tanggal_akhir = filters.tanggal_akhir;
-    if (filters.tanggal_awal) params.tanggal_awal = filters.tanggal_awal;
-    if (filters.search) params.search = filters.search;
 
-    if (filters.branch) params.branch = filters.branch;
-    if (filters.channel) params.channel = filters.channel;
+    if (filters.tanggal_awal) params.tanggal_awal = filters.tanggal_awal;
+    if (filters.tanggal_akhir) params.tanggal_akhir = filters.tanggal_akhir;
+    if (filters.search) params.search = filters.search;
     if (filters.official) params.official = filters.official;
+
+    // Kirim sebagai array untuk multiple selection
+    if (filters.branch && filters.branch.length > 0) {
+      params.branch = filters.branch;
+    }
+    if (filters.channel && filters.channel.length > 0) {
+      params.channel = filters.channel;
+    }
 
     const response = await axios.get(`${API_BASE}/leads`, { params });
 
@@ -509,9 +546,11 @@ const debouncedFetch = () => {
 };
 
 const resetFilters = () => {
+  filters.tanggal_awal = "";
+  filters.tanggal_akhir = "";
   filters.search = "";
-  filters.branch = "";
-  filters.channel = "";
+  filters.branch = [];
+  filters.channel = [];
   filters.official = "";
   filters.per_page = 10;
   filters.page = 1;
@@ -568,7 +607,6 @@ const confirmDelete = async () => {
     showNotification("success", "Data leads berhasil dihapus!");
     closeDeleteModal();
 
-    // Refresh data
     await fetchLeads();
   } catch (error) {
     console.error("Error deleting lead:", error);
