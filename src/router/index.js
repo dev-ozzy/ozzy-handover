@@ -63,6 +63,12 @@ const routes = [
     component: LeadListPage,
     meta: { requiresAuth: true },
   },
+  {
+    path: "/wa-monitor",
+    name: "wa-monitor",
+    component: () => import("@/views/WaMonitorView.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 const router = createRouter({
   history: createWebHistory(),

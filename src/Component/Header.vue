@@ -164,20 +164,23 @@ const isSuperadmin = () => auth.role === "Superadmin";
 const navigation = computed(() => {
   const items = [];
 
-  if (isDealMaker() || isSpvDealMaker()) {
+  if (isDealMaker() || isSpvDealMaker() || isSuperadmin()) {
     items.push({ name: "Handover DM", href: "/deal-maker" });
   }
 
-  if (isCsBackEnd()) {
+  if (isCsBackEnd() || isSuperadmin()) {
     items.push({ name: "Handover BE", href: "/cs-be" });
   }
 
-  if (isCsBackEnd() || isDealMaker() || isSpvDealMaker()) {
+  if (isCsBackEnd() || isDealMaker() || isSpvDealMaker() || isSuperadmin()) {
     items.push({ name: "Lead", href: "/lead" }); // assuming you have a lead route
   }
 
   if (isSuperadmin() || isSpvDealMaker()) {
     items.push({ name: "Lead List", href: "/lead-list" }); // assuming you have a lead list route
+  }
+  if (isCsBackEnd() || isDealMaker() || isSpvDealMaker() || isSuperadmin()) {
+    items.push({ name: "WA Monitor", href: "/wa-monitor" });
   }
 
   return items;
