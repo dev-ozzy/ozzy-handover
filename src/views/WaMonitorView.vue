@@ -40,14 +40,28 @@
     <template v-if="activeTab === 'monitor'">
       <!-- ── Stats ── -->
       <div class="flex gap-3 mb-4 flex-wrap">
-        <div
-          class="border border-gray-200 rounded-lg px-4 py-2.5 text-sm bg-white"
+        <button
+          @click="
+            filterLevel = null;
+            selectPage(null);
+          "
+          class="border border-gray-200 rounded-lg px-4 py-2.5 text-sm bg-white transition-all"
+          :class="
+            filterLevel || selectedPage
+              ? 'hover:bg-gray-50 border-gray-400 ring-1 ring-gray-300'
+              : 'cursor-default'
+          "
         >
           <span class="text-gray-400">Total Unread</span>
           <span class="ml-2 font-bold text-gray-700">{{
             conversations.length
           }}</span>
-        </div>
+          <span
+            v-if="filterLevel || selectedPage"
+            class="ml-1.5 text-xs text-gray-400"
+            >✕</span
+          >
+        </button>
         <button
           @click="filterLevel = filterLevel === 'warn' ? null : 'warn'"
           class="border rounded-lg px-4 py-2.5 text-sm transition-all"
