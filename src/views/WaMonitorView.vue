@@ -658,23 +658,30 @@ const filtered = computed(() => {
 });
 
 const pageGroups = computed(() => {
-  const source = filterLevel.value
-    ? conversations.value.filter(
-        (c) => getLevel(c.unread_since) === filterLevel.value,
-      )
-    : conversations.value;
-  const map = {};
-  source.forEach((c) => {
-    if (!map[c.page_id])
-      map[c.page_id] = {
+  // Daftar pages selalu dari SEMUA conversations (tanpa filter level)
+  const allMap = {};
+  conversations.value.forEach((c) => {
+    if (!allMap[c.page_id])
+      allMap[c.page_id] = {
         page_id: c.page_id,
         page_name: c.page_name,
         page_type: c.page_type,
         count: 0,
       };
-    map[c.page_id].count++;
   });
-  return Object.values(map).sort((a, b) => {
+
+  // Count-nya baru pakai filter level
+  const source = filterLevel.value
+    ? conversations.value.filter(
+        (c) => getLevel(c.unread_since) === filterLevel.value,
+      )
+    : conversations.value;
+
+  source.forEach((c) => {
+    if (allMap[c.page_id]) allMap[c.page_id].count++;
+  });
+
+  return Object.values(allMap).sort((a, b) => {
     if (a.page_type === b.page_type)
       return a.page_name.localeCompare(b.page_name);
     return a.page_type === "Official" ? -1 : 1;
