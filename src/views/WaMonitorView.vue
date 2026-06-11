@@ -23,6 +23,17 @@
         📊 Monitor
       </button>
       <button
+        @click="activeTab = 'labels'"
+        class="px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px"
+        :class="
+          activeTab === 'labels'
+            ? 'border-blue-600 text-blue-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        "
+      >
+        🏷️ Label Grouping
+      </button>
+      <button
         v-if="isSuperadmin"
         @click="activeTab = 'pages'"
         class="px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px"
@@ -244,6 +255,13 @@
                 class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium shrink-0"
                 >{{ c.page_name }}</span
               >
+              <span
+                v-for="tag in getConversationTagIds(c)"
+                :key="tag"
+                class="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium shrink-0"
+              >
+                {{ getTagLabel(tag) }}
+              </span>
             </div>
             <p class="text-xs text-gray-500 truncate mt-0.5">{{ c.msg }}</p>
             <p class="text-xs text-gray-400 mt-0.5">+{{ c.phone }}</p>
@@ -269,6 +287,266 @@
           </div>
         </a>
       </div>
+    </template>
+
+    <!-- ══════════════════════════════════════════════ TAB: LABEL GROUPING ══ -->
+    <template v-if="activeTab === 'labels'">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">Label Grouping</h2>
+          <p class="text-sm text-gray-500">
+            Chat aktif dikelompokkan berdasarkan label Pancake.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-400">
+          Auto-refresh {{ countdownSec }}d
+          <span>{{ lastFetch }}</span>
+          <button
+            @click="manualRefresh"
+            class="ml-1 text-xs text-blue-500 hover:underline"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div v-if="labelReorderError" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ labelReorderError }}
+      </div>
+
+      <div class="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-3 md:grid-cols-3">
+        <MultiSelect
+          v-model="labelFilterFlow"
+          :options="flowFilterOptions"
+          label="By flow"
+          placeholder="Pilih flow..."
+        />
+        <MultiSelect
+          v-model="labelFilterInformation"
+          :options="informationFilterOptions"
+          label="By informasi"
+          placeholder="Pilih informasi..."
+        />
+        <MultiSelect
+          v-model="labelFilterHandleBy"
+          :options="handleByFilterOptions"
+          label="By handle by (assignee)"
+          placeholder="Pilih assignee..."
+        />
+      </div>
+
+      <section class="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 shadow-sm">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="h-3 w-3 rounded-full bg-orange-500"></span>
+              <h3 class="text-base font-semibold text-gray-900">Flow</h3>
+            </div>
+            <p class="text-xs text-gray-500">
+              {{ labelFlowTotal }} chat dikelompokkan berdasarkan flow.
+            </p>
+          </div>
+          <span class="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+            {{ labelFlowTotal }} total
+          </span>
+        </div>
+
+        <div class="grid gap-5" :class="unassigned.length ? 'xl:grid-cols-3' : 'xl:grid-cols-2'">
+          <div
+            v-for="section in labelGroups"
+            :key="section.id"
+            class="rounded-xl border border-white/80 bg-white/60 p-3 shadow-sm"
+          >
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h4 class="font-semibold text-gray-900">{{ section.name }}</h4>
+              <span class="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">
+                {{ getSectionTotal(section) }} chat
+              </span>
+            </div>
+
+            <draggable
+              v-model="section.labels"
+              item-key="id"
+              handle=".drag-handle"
+              ghost-class="opacity-50"
+              :group="{ name: 'labels' }"
+              class="flex flex-col gap-3 min-h-[2rem]"
+              @end="saveLabelReorder"
+            >
+              <template #item="{ element: label }">
+                <div
+                  class="rounded-xl border p-3 transition-colors"
+                  :class="getLabelCardClass(label)"
+                >
+                  <button
+                    type="button"
+                    @click="toggleFlowGroup(label.name)"
+                    class="flex w-full items-center justify-between gap-2 text-left"
+                  >
+                    <div class="flex items-center gap-2 font-semibold text-gray-800">
+                      <span
+                        v-if="isSuperadmin"
+                        class="drag-handle cursor-grab text-gray-400 select-none"
+                      >⠿</span>
+                      <span class="h-2.5 w-2.5 rounded-full" :class="getLabelDotClass(label)"></span>
+                      <span>{{ label.name }}</span>
+                      <span class="text-gray-500">({{ getLabelItems(label).length }} chat)</span>
+                    </div>
+                    <span class="rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                      {{ isFlowGroupOpen(label.name) ? 'Tutup' : 'Buka' }}
+                    </span>
+                  </button>
+
+                  <div v-if="isFlowGroupOpen(label.name) && getLabelItems(label).length" class="mt-3 flex flex-col gap-2">
+                    <div
+                      v-for="c in getLabelItems(label)"
+                      :key="`${label.name}-${c.id}`"
+                      class="rounded-lg border border-white/80 bg-white/80 shadow-sm"
+                    >
+                      <a
+                        :href="c.conversation_link || undefined"
+                        target="_blank"
+                        rel="noopener"
+                        class="grid gap-3 px-3 py-2 no-underline hover:bg-white rounded-lg md:grid-cols-[2rem_minmax(0,1fr)_10rem_4rem]"
+                      >
+                        <div
+                          class="w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold shrink-0"
+                          :class="getLabelAvatarClass(label)"
+                        >
+                          {{ getInitials(c.name) }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="truncate text-sm font-semibold text-gray-800">{{ c.name }}</span>
+                            <span class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[11px] text-gray-500">
+                              {{ c.page_name }}
+                            </span>
+                            <span
+                              v-if="getLabelDurationSince(c, label.pancake_tag_id)"
+                              class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700"
+                            >
+                              Flow {{ formatTimer(getLabelDurationSince(c, label.pancake_tag_id)) }}
+                            </span>
+                          </div>
+                          <p class="truncate text-xs text-gray-500">{{ c.msg }}</p>
+                          <div v-if="getInformationLabels(c).length" class="mt-1 flex flex-wrap gap-1">
+                            <span
+                              v-for="infoLabel in getInformationLabels(c)"
+                              :key="`${c.id}-${infoLabel}`"
+                              class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
+                            >
+                              {{ infoLabel }}
+                            </span>
+                          </div>
+                        </div>
+                        <div class="min-w-0">
+                          <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                            Handle by
+                          </div>
+                          <div v-if="getHandleBy(c).length" class="flex flex-wrap gap-1">
+                            <span
+                              v-for="name in getHandleBy(c)"
+                              :key="`${c.id}-${name}`"
+                              class="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700"
+                            >
+                              {{ name }}
+                            </span>
+                          </div>
+                          <span v-else class="text-xs text-gray-400">-</span>
+                        </div>
+                        <div class="flex flex-col items-end gap-1">
+                          <span class="text-xs font-medium text-gray-500">{{ formatTimer(c.unread_since) }}</span>
+                          <button
+                            type="button"
+                            @click.prevent="toggleHistory(c.id)"
+                            class="text-[11px] text-indigo-500 hover:text-indigo-700 hover:underline"
+                          >
+                            {{ historyOpen[c.id] ? '▲ history' : '▼ history' }}
+                          </button>
+                        </div>
+                      </a>
+
+                      <!-- History panel -->
+                      <div v-if="historyOpen[c.id]" class="border-t border-gray-100 px-3 py-2">
+                        <div v-if="!historyData[c.id]" class="text-xs text-gray-400">Memuat...</div>
+                        <div v-else-if="historyData[c.id].history?.length === 0" class="text-xs text-gray-400">Belum ada history.</div>
+                        <div v-else class="flex flex-col gap-1">
+                          <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Riwayat Flow</div>
+                          <div
+                            v-for="(row, i) in historyData[c.id].history"
+                            :key="i"
+                            class="flex items-center gap-2 text-xs"
+                          >
+                            <span class="w-2 h-2 rounded-full shrink-0"
+                              :class="row.exited_at ? 'bg-gray-300' : 'bg-green-400'"></span>
+                            <span class="font-semibold text-gray-700 w-24 shrink-0">{{ row.label_name }}</span>
+                            <span class="text-gray-400">
+                              {{ new Date(row.entered_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short' }) }}
+                              {{ new Date(row.entered_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) }}
+                            </span>
+                            <span class="text-gray-300">→</span>
+                            <span class="text-gray-400">
+                              {{ row.exited_at
+                                ? new Date(row.exited_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })
+                                : 'sekarang' }}
+                            </span>
+                            <span class="ml-auto font-semibold"
+                              :class="row.exited_at ? 'text-gray-600' : 'text-amber-600'">
+                              {{ formatDurationMs(row.duration_ms ?? (Date.now() - row.entered_at)) }}
+                            </span>
+                          </div>
+                          <div v-if="historyData[c.id].total_ms" class="mt-1 flex justify-between border-t border-gray-100 pt-1 text-xs font-semibold">
+                            <span class="text-gray-500">Total waktu</span>
+                            <span class="text-indigo-600">{{ formatDurationMs(historyData[c.id].total_ms) }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else-if="isFlowGroupOpen(label.name)" class="mt-3 rounded-lg bg-gray-50 py-4 text-center text-xs text-gray-400">
+                    Tidak ada chat untuk label ini.
+                  </div>
+                </div>
+              </template>
+            </draggable>
+          </div>
+
+          <!-- Unassigned column -->
+          <div
+            v-if="isSuperadmin && unassigned.length"
+            class="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-3 shadow-sm"
+          >
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <h4 class="font-semibold text-gray-600">Belum Assign</h4>
+                <p class="text-[11px] text-gray-400">Drag ke kolom untuk mengaktifkan</p>
+              </div>
+              <span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                {{ unassigned.length }}
+              </span>
+            </div>
+
+            <draggable
+              v-model="unassigned"
+              item-key="id"
+              handle=".drag-handle"
+              ghost-class="opacity-50"
+              :group="{ name: 'labels' }"
+              class="flex flex-col gap-2 min-h-[2rem]"
+              @end="saveLabelReorder"
+            >
+              <template #item="{ element: label }">
+                <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <span class="drag-handle cursor-grab text-gray-300 select-none shrink-0">⠿</span>
+                  <span class="flex-1 text-sm text-gray-600">{{ label.name }}</span>
+                  <span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-400">unassigned</span>
+                </div>
+              </template>
+            </draggable>
+          </div>
+        </div>
+      </section>
+
     </template>
 
     <!-- ══════════════════════════════════════════════ TAB: MASTER PAGES ══ -->
@@ -561,6 +839,8 @@ import {
   TransitionRoot,
 } from "@headlessui/vue";
 import { useAuthStore } from "@/stores/auth";
+import MultiSelect from "../Component/MultiSelect.vue";
+import draggable from "vuedraggable";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 const auth = useAuthStore();
@@ -576,6 +856,9 @@ const conversations = ref([]);
 const loadingConv = ref(false);
 const convError = ref("");
 const pageErrors = ref([]);
+const tagDebug = ref([]);
+const tagErrors = ref([]);
+const loadingTags = ref(false);
 const refreshInterval = ref(30); // dari DB
 const countdownSec = ref(30);
 const lastFetch = ref("-");
@@ -583,6 +866,17 @@ const warnMin = ref(5);
 const critMin = ref(15);
 const selectedPage = ref(null);
 const filterLevel = ref(null); // null | 'warn' | 'crit'
+const openFlowLabels = ref([]);
+const labelFilterFlow = ref([]);
+const labelFilterInformation = ref([]);
+const labelFilterHandleBy = ref([]);
+const labelGroups = ref([]);
+const informationLabels = ref([]);
+const unassigned = ref([]);
+const labelReorderSaving = ref(false);
+const labelReorderError = ref("");
+const historyOpen = ref({});
+const historyData = ref({});
 
 let countdownTimer = null;
 let tickTimer = null;
@@ -699,11 +993,309 @@ const critCount = computed(
       .length,
 );
 
+const tagNameById = computed(() => {
+  const map = {};
+  labelGroups.value.forEach((group) => {
+    (group.labels ?? []).forEach((label) => {
+      if (label.pancake_tag_id !== undefined && label.name) {
+        map[String(label.pancake_tag_id)] = label.name;
+      }
+    });
+  });
+  informationLabels.value.forEach((label) => {
+    if (label.pancake_tag_id !== undefined && label.name) {
+      map[String(label.pancake_tag_id)] = label.name;
+    }
+  });
+  collectTagObjects(tagDebug.value).forEach((tag) => {
+    const id = tag.pancake_tag_id ?? tag.tag_id ?? tag.tagId ?? tag.id;
+    const name = tag.name ?? tag.title ?? tag.text ?? tag.label ?? tag.tag_name;
+    if (id !== undefined && name && !map[String(id)]) map[String(id)] = name;
+  });
+  return map;
+});
+
+function getLabelItems(label) {
+  const tagId = String(label.pancake_tag_id ?? "");
+  const items = sorted.value.filter((conversation) => {
+    if (!getConversationTagIds(conversation).includes(tagId)) return false;
+    if (
+      labelFilterFlow.value.length &&
+      !labelFilterFlow.value.includes(label.name)
+    ) return false;
+    if (
+      labelFilterInformation.value.length &&
+      !getInformationLabels(conversation).some((info) =>
+        labelFilterInformation.value.includes(info),
+      )
+    ) return false;
+    if (
+      labelFilterHandleBy.value.length &&
+      !getHandleBy(conversation).some((name) =>
+        labelFilterHandleBy.value.includes(name),
+      )
+    ) return false;
+    return true;
+  });
+
+  // Sort: longest time in this flow label first, then longest unread first
+  return items.slice().sort((a, b) => {
+    const sinceA = getLabelDurationSince(a, tagId) ?? Infinity;
+    const sinceB = getLabelDurationSince(b, tagId) ?? Infinity;
+    if (sinceA !== sinceB) return sinceA - sinceB; // smaller since = older = longer duration
+    return a.unread_since - b.unread_since;
+  });
+}
+
+function getSectionTotal(section) {
+  return (section.labels ?? []).reduce((sum, label) => sum + getLabelItems(label).length, 0);
+}
+
+const labelFlowTotal = computed(() =>
+  labelGroups.value.reduce((sum, section) => sum + getSectionTotal(section), 0),
+);
+
+const flowFilterOptions = computed(() =>
+  labelGroups.value.flatMap((group) => (group.labels ?? []).map((label) => label.name)),
+);
+
+const informationFilterOptions = computed(() => {
+  const labels = new Set();
+  sorted.value.forEach((conversation) => {
+    getInformationLabels(conversation).forEach((label) => labels.add(label));
+  });
+  informationLabels.value.forEach((label) => labels.add(label.name));
+  return [...labels].sort((a, b) => a.localeCompare(b));
+});
+
+const handleByFilterOptions = computed(() => {
+  const names = new Set();
+  sorted.value.forEach((conversation) => {
+    getHandleBy(conversation).forEach((name) => names.add(name));
+  });
+  return [...names].sort((a, b) => a.localeCompare(b));
+});
+
+function collectTagObjects(value, result = []) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectTagObjects(item, result));
+    return result;
+  }
+
+  if (!value || typeof value !== "object") return result;
+
+  const hasTagShape =
+    (value.pancake_tag_id !== undefined ||
+      value.id !== undefined ||
+      value.tag_id !== undefined ||
+      value.tagId !== undefined) &&
+    (value.name || value.title || value.text || value.label || value.tag_name);
+
+  if (hasTagShape) result.push(value);
+
+  Object.values(value).forEach((item) => collectTagObjects(item, result));
+  return result;
+}
+
+function getConversationTagIds(conversation) {
+  const tags = conversation.tags ?? [];
+  return Array.isArray(tags) ? tags.map((tag) => String(tag)) : [];
+}
+
+function getTagLabel(tag) {
+  return tagNameById.value[String(tag)] ?? `Tag ${tag}`;
+}
+
+function getConversationLabels(conversation) {
+  return getConversationTagIds(conversation).map((tag) => getTagLabel(tag));
+}
+
+function getInformationLabels(conversation) {
+  return getConversationLabels(conversation).filter((label) =>
+    informationLabels.value.some((item) => item.name === label),
+  );
+}
+
+function getLabelDurationSince(conversation, tagId) {
+  const durations = conversation.label_durations ?? conversation.labelDurations ?? [];
+  if (!Array.isArray(durations)) return null;
+  const duration = durations.find(
+    (item) => String(item.pancake_tag_id) === String(tagId),
+  );
+  return duration?.since ?? null;
+}
+
+function getHandleBy(conversation) {
+  const value = conversation.handle_by ?? conversation.handleBy ?? [];
+  if (Array.isArray(value)) return value.filter(Boolean).map((name) => String(name));
+  if (value) return [String(value)];
+  return [];
+}
+
+async function toggleHistory(conversationId) {
+  if (historyOpen.value[conversationId]) {
+    historyOpen.value = { ...historyOpen.value, [conversationId]: false };
+    return;
+  }
+  historyOpen.value = { ...historyOpen.value, [conversationId]: true };
+  if (historyData.value[conversationId]) return; // already loaded
+  try {
+    const { data } = await axios.get(`${API_BASE}/wa-monitor/history`, {
+      params: { conversation_id: conversationId },
+    });
+    historyData.value = { ...historyData.value, [conversationId]: data };
+  } catch {
+    historyData.value = { ...historyData.value, [conversationId]: null };
+  }
+}
+
+function formatDurationMs(ms) {
+  if (!ms) return "—";
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return `${h}j ${m}m`;
+  return `${m}m`;
+}
+
+function isFlowGroupOpen(label) {
+  return openFlowLabels.value.includes(label);
+}
+
+function toggleFlowGroup(label) {
+  openFlowLabels.value = isFlowGroupOpen(label)
+    ? openFlowLabels.value.filter((item) => item !== label)
+    : [...openFlowLabels.value, label];
+}
+
+function getLabelColorKey(label) {
+  return typeof label === "object" ? label.color : null;
+}
+
+function getLabelCardClass(label) {
+  const classes = {
+    indigo: "border-indigo-100 bg-indigo-50",
+    emerald: "border-emerald-100 bg-emerald-50",
+    violet: "border-violet-100 bg-violet-50",
+    amber: "border-amber-100 bg-amber-50",
+    yellow: "border-yellow-100 bg-yellow-50",
+    orange: "border-orange-100 bg-orange-50",
+    green: "border-green-100 bg-green-50",
+    cyan: "border-cyan-100 bg-cyan-50",
+    lime: "border-lime-100 bg-lime-50",
+    teal: "border-teal-100 bg-teal-50",
+  };
+
+  return classes[getLabelColorKey(label)] || "border-gray-100 bg-white";
+}
+
+function getLabelDotClass(label) {
+  const classes = {
+    indigo: "bg-indigo-500",
+    emerald: "bg-emerald-500",
+    violet: "bg-violet-500",
+    amber: "bg-amber-500",
+    yellow: "bg-yellow-500",
+    orange: "bg-orange-500",
+    green: "bg-green-500",
+    cyan: "bg-cyan-500",
+    lime: "bg-lime-500",
+    teal: "bg-teal-500",
+  };
+
+  return classes[getLabelColorKey(label)] || "bg-gray-400";
+}
+
+function getLabelAvatarClass(label) {
+  const classes = {
+    indigo: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    violet: "border-violet-200 bg-violet-50 text-violet-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    yellow: "border-yellow-200 bg-yellow-50 text-yellow-700",
+    orange: "border-orange-200 bg-orange-50 text-orange-700",
+    green: "border-green-200 bg-green-50 text-green-700",
+    cyan: "border-cyan-200 bg-cyan-50 text-cyan-700",
+    lime: "border-lime-200 bg-lime-50 text-lime-700",
+    teal: "border-teal-200 bg-teal-50 text-teal-700",
+  };
+
+  return classes[getLabelColorKey(label)] || "border-gray-200 bg-white text-gray-600";
+}
+
+async function fetchPancakeTags() {
+  loadingTags.value = true;
+  tagErrors.value = [];
+  try {
+    const { data } = await axios.get(`${API_BASE}/wa-monitor/tags`);
+    tagDebug.value = data.tags ?? data.data ?? [];
+    tagErrors.value = data.errors ?? [];
+  } catch (err) {
+    tagErrors.value = [
+      err.response?.data?.error ?? err.message ?? "Gagal mengambil tag dictionary.",
+    ];
+  } finally {
+    loadingTags.value = false;
+  }
+}
+
+async function fetchLabelConfig() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/wa-monitor/labels`);
+    labelGroups.value = data.groups ?? [];
+    informationLabels.value = data.information_labels ?? [];
+    unassigned.value = data.unassigned ?? [];
+  } catch (err) {
+    tagErrors.value = [
+      err.response?.data?.error ?? err.message ?? "Gagal mengambil label monitor.",
+    ];
+  }
+}
+
+async function saveLabelReorder() {
+  labelReorderSaving.value = true;
+  labelReorderError.value = "";
+  try {
+    const groups = labelGroups.value.map((group) => ({
+      id: group.id,
+      labels: (group.labels ?? []).map((label, i) => ({
+        id: label.id,
+        sort_order: i,
+      })),
+    }));
+    const infoLabels = informationLabels.value.map((label, i) => ({
+      id: label.id,
+      sort_order: i,
+    }));
+    const unassignedPayload = unassigned.value.map((label, i) => ({
+      id: label.id,
+      sort_order: i,
+    }));
+    await axios.post(`${API_BASE}/wa-monitor/labels/reorder`, {
+      groups,
+      information_labels: infoLabels,
+      unassigned: unassignedPayload,
+    });
+    await fetchLabelConfig();
+  } catch (err) {
+    const msg = err.response?.data?.message
+      ?? err.response?.data?.error
+      ?? err.message
+      ?? "Gagal menyimpan urutan.";
+    const validationErrors = err.response?.data?.errors;
+    labelReorderError.value = validationErrors
+      ? Object.values(validationErrors).flat().join(" | ")
+      : msg;
+  } finally {
+    labelReorderSaving.value = false;
+  }
+}
+
 /* ── Tick live timer ── */
 function startTick() {
   tickTimer = setInterval(() => {
     conversations.value = [...conversations.value];
-  }, 1000);
+  }, 60000);
 }
 
 /* ── Countdown ── */
@@ -715,6 +1307,8 @@ function startCountdown() {
     if (countdownSec.value <= 0) {
       countdownSec.value = refreshInterval.value;
       fetchConversations();
+      fetchLabelConfig();
+      fetchPancakeTags();
     }
   }, 1000);
 }
@@ -741,6 +1335,8 @@ async function fetchConversations() {
 function manualRefresh() {
   countdownSec.value = refreshInterval.value;
   fetchConversations();
+  fetchLabelConfig();
+  fetchPancakeTags();
 }
 
 /* ── Settings ── */
@@ -849,7 +1445,9 @@ async function deletePage(page) {
 /* ── Lifecycle ── */
 onMounted(() => {
   fetchSettings();
+  fetchLabelConfig();
   fetchConversations();
+  fetchPancakeTags();
   fetchPages();
   startTick();
 });
