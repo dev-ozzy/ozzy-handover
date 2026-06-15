@@ -65,7 +65,7 @@
         >
           <span class="text-gray-400">Total Unread</span>
           <span class="ml-2 font-bold text-gray-700">{{
-            conversations.length
+            unreadCount
           }}</span>
           <span
             v-if="filterLevel || selectedPage"
@@ -138,9 +138,9 @@
             Semua ({{
               filterLevel
                 ? conversations.filter(
-                    (c) => getLevel(c.unread_since) === filterLevel,
+                    (c) => c.unread_since && getLevel(c.unread_since) === filterLevel,
                   ).length
-                : conversations.length
+                : unreadCount
             }})
           </button>
           <button
@@ -314,12 +314,18 @@
         {{ labelReorderError }}
       </div>
 
-      <div class="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-3 md:grid-cols-3">
+      <div class="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-3 md:grid-cols-4">
         <MultiSelect
           v-model="labelFilterFlow"
           :options="flowFilterOptions"
           label="By flow"
           placeholder="Pilih flow..."
+        />
+        <MultiSelect
+          v-model="labelFilterCabang"
+          :options="cabangFilterOptions"
+          label="By cabang"
+          placeholder="Pilih cabang..."
         />
         <MultiSelect
           v-model="labelFilterInformation"
@@ -335,6 +341,217 @@
         />
       </div>
 
+      <section v-if="isSuperadmin && unassigned.length" class="mb-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50/60 p-4 shadow-sm">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="h-3 w-3 rounded-full bg-gray-400"></span>
+              <h3 class="text-base font-semibold text-gray-900">Label Belum Masuk Flow</h3>
+            </div>
+            <p class="text-xs text-gray-500">
+              Label yang belum dipetakan ke Deal Maker atau Back End.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-600">
+              {{ unassigned.length }} total
+            </span>
+            <span class="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-700">
+              {{ unassignedOpen ? 'Buka' : 'Tutup' }}
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          @click="unassignedOpen = !unassignedOpen"
+          class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+        >
+          {{ unassignedOpen ? 'Tutup' : 'Buka' }}
+        </button>
+
+        <draggable
+          v-if="unassignedOpen"
+          v-model="unassigned"
+          item-key="id"
+          handle=".drag-handle"
+          ghost-class="opacity-50"
+          :group="{ name: 'labels' }"
+          class="mt-3 flex flex-col gap-3 min-h-[2rem]"
+          @end="saveLabelReorder"
+        >
+          <template #item="{ element: label }">
+            <div
+              class="rounded-xl border p-3 transition-colors"
+              :class="getLabelCardClass(label)"
+            >
+              <button
+                type="button"
+                @click="toggleFlowGroup(label.name)"
+                class="flex w-full items-center justify-between gap-2 text-left"
+              >
+                <div class="flex items-center gap-2 font-semibold text-gray-800">
+                  <span
+                    v-if="isSuperadmin"
+                    class="drag-handle cursor-grab text-gray-400 select-none"
+                  >⠿</span>
+                  <span class="h-2.5 w-2.5 rounded-full" :class="getLabelDotClass(label)"></span>
+                  <span>{{ label.name }}</span>
+                  <span class="text-gray-500">({{ getLabelItems(label).length }} chat)</span>
+                </div>
+                <span class="rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                  {{ isFlowGroupOpen(label.name) ? 'Tutup' : 'Buka' }}
+                </span>
+              </button>
+
+              <template v-if="isFlowGroupOpen(label.name)">
+                <div v-if="getLabelItems(label).length" class="mt-3 flex flex-col gap-2">
+                  <div class="hidden md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4.5rem_3.5rem_4rem_4rem] gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                    <div></div>
+                    <div></div>
+                    <div>CABANG</div>
+                    <div>HANDLE BY</div>
+                    <div>INFO</div>
+                    <div>UNREAD</div>
+                    <div>FLOW</div>
+                    <div>TOTAL FLOW</div>
+                  </div>
+                  <div
+                    v-for="c in getLabelItems(label)"
+                    :key="`${label.name}-${c.id}`"
+                    class="rounded-lg border border-white/80 bg-white/80 shadow-sm"
+                  >
+                    <a
+                      :href="c.conversation_link || undefined"
+                      target="_blank"
+                      rel="noopener"
+                      class="grid gap-1.5 px-3 py-2 no-underline hover:bg-white rounded-lg md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4.5rem_3.5rem_4rem_4rem]"
+                    >
+                      <div
+                        class="w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold shrink-0"
+                        :class="getLabelAvatarClass(label)"
+                      >
+                        {{ getInitials(c.name) }}
+                      </div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <span class="truncate text-sm font-semibold text-gray-800">{{ c.name }}</span>
+                        </div>
+                        <p class="truncate text-xs text-gray-500 mt-0.5">{{ c.msg }}</p>
+                      </div>
+                      <div class="min-w-0">
+                        <span class="text-xs text-gray-600 truncate block">{{ c.page_name || '-' }}</span>
+                      </div>
+                      <div class="min-w-0">
+                        <div v-if="getHandleBy(c).length" class="flex gap-0.5 items-center">
+                          <div
+                            v-for="name in getHandleBy(c)"
+                            :key="`${c.id}-${name}`"
+                            class="relative group"
+                          >
+                            <span
+                              class="rounded-full bg-purple-100 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 truncate max-w-full cursor-default"
+                            >{{ name.split(' ')[0] }}</span>
+                            <div
+                              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 rounded bg-gray-800 text-white text-[10px] whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            >{{ name }}</div>
+                          </div>
+                        </div>
+                        <span v-else class="text-xs text-gray-400">-</span>
+                      </div>
+                      <div class="min-w-0">
+                        <div v-if="getInformationLabels(c).length" class="flex flex-wrap gap-1">
+                          <span
+                            v-for="infoLabel in getInformationLabels(c)"
+                            :key="`${c.id}-${infoLabel}`"
+                            class="rounded-full bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 truncate max-w-full"
+                          >{{ infoLabel }}</span>
+                        </div>
+                        <span v-else class="text-xs text-gray-400">-</span>
+                      </div>
+                      <div class="text-right">
+                        <span class="text-xs font-mono font-semibold text-gray-500">{{ formatTimer(c.unread_since) }}</span>
+                      </div>
+                      <div class="text-right">
+                        <span
+                          v-if="getLabelDurationSince(c, label.pancake_tag_id)"
+                          class="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 whitespace-nowrap"
+                        >
+                          {{ formatTimer(getLabelDurationSince(c, label.pancake_tag_id)) }}
+                        </span>
+                        <span v-else class="text-xs text-gray-400">-</span>
+                      </div>
+                      <div class="text-right">
+                        <span
+                          v-if="getTotalFlow(c)"
+                          class="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 whitespace-nowrap"
+                        >
+                          {{ formatDurationMs(getTotalFlow(c)) }}
+                        </span>
+                        <span v-else class="text-xs text-gray-400">-</span>
+                        <button
+                          type="button"
+                          @click.prevent="toggleHistory(c.id)"
+                          class="block ml-auto text-[11px] text-indigo-500 hover:text-indigo-700 hover:underline mt-1"
+                        >
+                          {{ historyOpen[c.id] ? '▲ history' : '▼ history' }}
+                        </button>
+                      </div>
+                    </a>
+
+                    <!-- History panel -->
+                    <div v-if="historyOpen[c.id]" class="border-t border-gray-100 px-3 py-2">
+                      <div v-if="!historyData[c.id]" class="text-xs text-gray-400">Memuat...</div>
+                      <div v-else-if="historyData[c.id].history?.length === 0" class="text-xs text-gray-400">Belum ada history.</div>
+                      <div v-else class="flex flex-col gap-1">
+                        <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Riwayat Flow</div>
+                        <template v-for="(cycleGroup, ci) in (historyData[c.id].cycles || [{ rows: historyData[c.id].history || [], cycle: 1 }])" :key="ci">
+                          <div v-if="historyData[c.id].cycles && ci > 0" class="border-t border-gray-100 my-1"></div>
+                          <div v-if="historyData[c.id].cycles" class="flex items-center gap-2 text-[11px] font-semibold tracking-wide">
+                            <span class="text-indigo-500">Putaran {{ cycleGroup.cycle }}</span>
+                            <span class="ml-auto text-gray-500 font-normal">{{ formatDurationMs(cycleGroup.cycle_total_ms) }}</span>
+                          </div>
+                          <div
+                            v-for="(row, j) in cycleGroup.rows"
+                            :key="j"
+                            class="flex items-center gap-2 text-xs"
+                          >
+                            <span class="w-2 h-2 rounded-full shrink-0"
+                              :class="row.exited_at ? 'bg-gray-300' : 'bg-green-400'"></span>
+                            <span class="font-semibold text-gray-700 w-24 shrink-0">{{ row.label_name }}</span>
+                            <span class="text-gray-400">
+                              {{ new Date(row.entered_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short' }) }}
+                              {{ new Date(row.entered_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) }}
+                            </span>
+                            <span class="text-gray-300">→</span>
+                            <span class="text-gray-400">
+                              {{ row.exited_at
+                                ? new Date(row.exited_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })
+                                : 'sekarang' }}
+                            </span>
+                            <span class="ml-auto font-semibold"
+                              :class="row.exited_at ? 'text-gray-600' : 'text-amber-600'">
+                              {{ formatDurationMs(row.duration_ms ?? (Date.now() - row.entered_at)) }}
+                            </span>
+                          </div>
+                        </template>
+                        <div v-if="historyData[c.id].total_ms" class="mt-1 flex justify-between border-t border-gray-100 pt-1 text-xs font-semibold">
+                          <span class="text-gray-500">Total waktu</span>
+                          <span class="text-indigo-600">{{ formatDurationMs(historyData[c.id].total_ms) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="mt-3 rounded-lg bg-gray-50 py-4 text-center text-xs text-gray-400">
+                  Tidak ada chat untuk label ini.
+                </div>
+              </template>
+            </div>
+          </template>
+        </draggable>
+      </section>
+
       <section class="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 shadow-sm">
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -346,12 +563,28 @@
               {{ labelFlowTotal }} chat dikelompokkan berdasarkan flow.
             </p>
           </div>
-          <span class="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
-            {{ labelFlowTotal }} total
-          </span>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              @click="openAllFlowGroups"
+              class="rounded-lg border border-orange-200 bg-white px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+            >
+              Buka Semua
+            </button>
+            <button
+              type="button"
+              @click="closeAllFlowGroups"
+              class="rounded-lg border border-orange-200 bg-white px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+            >
+              Tutup Semua
+            </button>
+            <span class="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+              {{ labelFlowTotal }} total
+            </span>
+          </div>
         </div>
 
-        <div class="grid gap-5" :class="unassigned.length ? 'xl:grid-cols-3' : 'xl:grid-cols-2'">
+        <div class="grid gap-5 xl:grid-cols-2">
           <div
             v-for="section in labelGroups"
             :key="section.id"
@@ -398,6 +631,16 @@
                   </button>
 
                   <div v-if="isFlowGroupOpen(label.name) && getLabelItems(label).length" class="mt-3 flex flex-col gap-2">
+                    <div class="hidden md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4.5rem_3.5rem_4rem_4rem] gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                      <div></div>
+                      <div></div>
+                      <div>CABANG</div>
+                      <div>HANDLE BY</div>
+                      <div>INFO</div>
+                      <div>UNREAD</div>
+                      <div>FLOW</div>
+                      <div>TOTAL FLOW</div>
+                    </div>
                     <div
                       v-for="c in getLabelItems(label)"
                       :key="`${label.name}-${c.id}`"
@@ -407,7 +650,7 @@
                         :href="c.conversation_link || undefined"
                         target="_blank"
                         rel="noopener"
-                        class="grid gap-3 px-3 py-2 no-underline hover:bg-white rounded-lg md:grid-cols-[2rem_minmax(0,1fr)_10rem_4rem]"
+                        class="grid gap-1.5 px-3 py-2 no-underline hover:bg-white rounded-lg md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4.5rem_3.5rem_4rem_4rem]"
                       >
                         <div
                           class="w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold shrink-0"
@@ -415,51 +658,66 @@
                         >
                           {{ getInitials(c.name) }}
                         </div>
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0">
                           <div class="flex items-center gap-1.5 flex-wrap">
                             <span class="truncate text-sm font-semibold text-gray-800">{{ c.name }}</span>
-                            <span class="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[11px] text-gray-500">
-                              {{ c.page_name }}
-                            </span>
-                            <span
-                              v-if="getLabelDurationSince(c, label.pancake_tag_id)"
-                              class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700"
-                            >
-                              Flow {{ formatTimer(getLabelDurationSince(c, label.pancake_tag_id)) }}
-                            </span>
                           </div>
-                          <p class="truncate text-xs text-gray-500">{{ c.msg }}</p>
-                          <div v-if="getInformationLabels(c).length" class="mt-1 flex flex-wrap gap-1">
-                            <span
-                              v-for="infoLabel in getInformationLabels(c)"
-                              :key="`${c.id}-${infoLabel}`"
-                              class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
-                            >
-                              {{ infoLabel }}
-                            </span>
-                          </div>
+                          <p class="truncate text-xs text-gray-500 mt-0.5">{{ c.msg }}</p>
                         </div>
                         <div class="min-w-0">
-                          <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                            Handle by
+                          <span class="text-xs text-gray-600 truncate block">{{ c.page_name || '-' }}</span>
+                        </div>
+                        <div class="min-w-0">
+                          <div v-if="getHandleBy(c).length" class="flex gap-0.5 items-center">
+                              <div
+                                v-for="name in getHandleBy(c)"
+                                :key="`${c.id}-${name}`"
+                                class="relative group"
+                              >
+                                <span
+                                  class="rounded-full bg-purple-100 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 truncate max-w-full cursor-default"
+                                >{{ name.split(' ')[0] }}</span>
+                                <div
+                                  class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 rounded bg-gray-800 text-white text-[10px] whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                >{{ name }}</div>
+                              </div>
+                            </div>
+                            <span v-else class="text-xs text-gray-400">-</span>
                           </div>
-                          <div v-if="getHandleBy(c).length" class="flex flex-wrap gap-1">
-                            <span
-                              v-for="name in getHandleBy(c)"
-                              :key="`${c.id}-${name}`"
-                              class="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700"
-                            >
-                              {{ name }}
-                            </span>
+                          <div class="min-w-0">
+                            <div v-if="getInformationLabels(c).length" class="flex flex-wrap gap-1">
+                              <span
+                                v-for="infoLabel in getInformationLabels(c)"
+                                :key="`${c.id}-${infoLabel}`"
+                                class="rounded-full bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 truncate max-w-full"
+                              >{{ infoLabel }}</span>
                           </div>
                           <span v-else class="text-xs text-gray-400">-</span>
                         </div>
-                        <div class="flex flex-col items-end gap-1">
-                          <span class="text-xs font-medium text-gray-500">{{ formatTimer(c.unread_since) }}</span>
+                        <div class="text-right">
+                          <span class="text-xs font-mono font-semibold text-gray-500">{{ formatTimer(c.unread_since) }}</span>
+                        </div>
+                        <div class="text-right">
+                          <span
+                            v-if="getLabelDurationSince(c, label.pancake_tag_id)"
+                            class="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 whitespace-nowrap"
+                          >
+                            {{ formatTimer(getLabelDurationSince(c, label.pancake_tag_id)) }}
+                          </span>
+                          <span v-else class="text-xs text-gray-400">-</span>
+                        </div>
+                        <div class="text-right">
+                          <span
+                            v-if="getTotalFlow(c)"
+                            class="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 whitespace-nowrap"
+                          >
+                            {{ formatDurationMs(getTotalFlow(c)) }}
+                          </span>
+                          <span v-else class="text-xs text-gray-400">-</span>
                           <button
                             type="button"
                             @click.prevent="toggleHistory(c.id)"
-                            class="text-[11px] text-indigo-500 hover:text-indigo-700 hover:underline"
+                            class="block ml-auto text-[11px] text-indigo-500 hover:text-indigo-700 hover:underline mt-1"
                           >
                             {{ historyOpen[c.id] ? '▲ history' : '▼ history' }}
                           </button>
@@ -472,29 +730,36 @@
                         <div v-else-if="historyData[c.id].history?.length === 0" class="text-xs text-gray-400">Belum ada history.</div>
                         <div v-else class="flex flex-col gap-1">
                           <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Riwayat Flow</div>
-                          <div
-                            v-for="(row, i) in historyData[c.id].history"
-                            :key="i"
-                            class="flex items-center gap-2 text-xs"
-                          >
-                            <span class="w-2 h-2 rounded-full shrink-0"
-                              :class="row.exited_at ? 'bg-gray-300' : 'bg-green-400'"></span>
-                            <span class="font-semibold text-gray-700 w-24 shrink-0">{{ row.label_name }}</span>
-                            <span class="text-gray-400">
-                              {{ new Date(row.entered_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short' }) }}
-                              {{ new Date(row.entered_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) }}
-                            </span>
-                            <span class="text-gray-300">→</span>
-                            <span class="text-gray-400">
-                              {{ row.exited_at
-                                ? new Date(row.exited_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })
-                                : 'sekarang' }}
-                            </span>
-                            <span class="ml-auto font-semibold"
-                              :class="row.exited_at ? 'text-gray-600' : 'text-amber-600'">
-                              {{ formatDurationMs(row.duration_ms ?? (Date.now() - row.entered_at)) }}
-                            </span>
-                          </div>
+                          <template v-for="(cycleGroup, ci) in (historyData[c.id].cycles || [{ rows: historyData[c.id].history || [], cycle: 1 }])" :key="ci">
+                            <div v-if="historyData[c.id].cycles && ci > 0" class="border-t border-gray-100 my-1"></div>
+                            <div v-if="historyData[c.id].cycles" class="flex items-center gap-2 text-[11px] font-semibold tracking-wide">
+                              <span class="text-indigo-500">Putaran {{ cycleGroup.cycle }}</span>
+                              <span class="ml-auto text-gray-500 font-normal">{{ formatDurationMs(cycleGroup.cycle_total_ms) }}</span>
+                            </div>
+                            <div
+                              v-for="(row, j) in cycleGroup.rows"
+                              :key="j"
+                              class="flex items-center gap-2 text-xs"
+                            >
+                              <span class="w-2 h-2 rounded-full shrink-0"
+                                :class="row.exited_at ? 'bg-gray-300' : 'bg-green-400'"></span>
+                              <span class="font-semibold text-gray-700 w-24 shrink-0">{{ row.label_name }}</span>
+                              <span class="text-gray-400">
+                                {{ new Date(row.entered_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short' }) }}
+                                {{ new Date(row.entered_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) }}
+                              </span>
+                              <span class="text-gray-300">→</span>
+                              <span class="text-gray-400">
+                                {{ row.exited_at
+                                  ? new Date(row.exited_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })
+                                  : 'sekarang' }}
+                              </span>
+                              <span class="ml-auto font-semibold"
+                                :class="row.exited_at ? 'text-gray-600' : 'text-amber-600'">
+                                {{ formatDurationMs(row.duration_ms ?? (Date.now() - row.entered_at)) }}
+                              </span>
+                            </div>
+                          </template>
                           <div v-if="historyData[c.id].total_ms" class="mt-1 flex justify-between border-t border-gray-100 pt-1 text-xs font-semibold">
                             <span class="text-gray-500">Total waktu</span>
                             <span class="text-indigo-600">{{ formatDurationMs(historyData[c.id].total_ms) }}</span>
@@ -511,39 +776,6 @@
             </draggable>
           </div>
 
-          <!-- Unassigned column -->
-          <div
-            v-if="isSuperadmin && unassigned.length"
-            class="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-3 shadow-sm"
-          >
-            <div class="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h4 class="font-semibold text-gray-600">Belum Assign</h4>
-                <p class="text-[11px] text-gray-400">Drag ke kolom untuk mengaktifkan</p>
-              </div>
-              <span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                {{ unassigned.length }}
-              </span>
-            </div>
-
-            <draggable
-              v-model="unassigned"
-              item-key="id"
-              handle=".drag-handle"
-              ghost-class="opacity-50"
-              :group="{ name: 'labels' }"
-              class="flex flex-col gap-2 min-h-[2rem]"
-              @end="saveLabelReorder"
-            >
-              <template #item="{ element: label }">
-                <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-                  <span class="drag-handle cursor-grab text-gray-300 select-none shrink-0">⠿</span>
-                  <span class="flex-1 text-sm text-gray-600">{{ label.name }}</span>
-                  <span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-400">unassigned</span>
-                </div>
-              </template>
-            </draggable>
-          </div>
         </div>
       </section>
 
@@ -868,11 +1100,13 @@ const selectedPage = ref(null);
 const filterLevel = ref(null); // null | 'warn' | 'crit'
 const openFlowLabels = ref([]);
 const labelFilterFlow = ref([]);
+const labelFilterCabang = ref([]);
 const labelFilterInformation = ref([]);
 const labelFilterHandleBy = ref([]);
 const labelGroups = ref([]);
 const informationLabels = ref([]);
 const unassigned = ref([]);
+const unassignedOpen = ref(false);
 const labelReorderSaving = ref(false);
 const labelReorderError = ref("");
 const historyOpen = ref({});
@@ -919,6 +1153,7 @@ function getLevel(sinceMs) {
 }
 
 function formatTimer(sinceMs) {
+  if (sinceMs === null || sinceMs === undefined) return '-';
   const totalSec = Math.max(0, Math.floor((Date.now() - sinceMs) / 1000));
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -935,7 +1170,11 @@ function selectPage(id) {
 
 /* ── Computed ── */
 const sorted = computed(() =>
-  [...conversations.value].sort((a, b) => a.unread_since - b.unread_since),
+  [...conversations.value].sort((a, b) => {
+    const aSince = a.unread_since ?? Infinity;
+    const bSince = b.unread_since ?? Infinity;
+    return aSince - bSince;
+  }),
 );
 
 const filtered = computed(() => {
@@ -982,14 +1221,18 @@ const pageGroups = computed(() => {
   });
 });
 
+const unreadCount = computed(() =>
+  conversations.value.filter((c) => c.unread_since !== null).length,
+);
+
 const warnCount = computed(
   () =>
-    conversations.value.filter((c) => getLevel(c.unread_since) === "warn")
+    conversations.value.filter((c) => c.unread_since !== null && getLevel(c.unread_since) === "warn")
       .length,
 );
 const critCount = computed(
   () =>
-    conversations.value.filter((c) => getLevel(c.unread_since) === "crit")
+    conversations.value.filter((c) => c.unread_since !== null && getLevel(c.unread_since) === "crit")
       .length,
 );
 
@@ -1035,6 +1278,10 @@ function getLabelItems(label) {
         labelFilterHandleBy.value.includes(name),
       )
     ) return false;
+    if (
+      labelFilterCabang.value.length &&
+      !labelFilterCabang.value.includes(conversation.page_name)
+    ) return false;
     return true;
   });
 
@@ -1074,6 +1321,14 @@ const handleByFilterOptions = computed(() => {
     getHandleBy(conversation).forEach((name) => names.add(name));
   });
   return [...names].sort((a, b) => a.localeCompare(b));
+});
+
+const cabangFilterOptions = computed(() => {
+  const pages = new Set();
+  sorted.value.forEach((conversation) => {
+    if (conversation.page_name) pages.add(conversation.page_name);
+  });
+  return [...pages].sort((a, b) => a.localeCompare(b));
 });
 
 function collectTagObjects(value, result = []) {
@@ -1125,6 +1380,10 @@ function getLabelDurationSince(conversation, tagId) {
   return duration?.since ?? null;
 }
 
+function getTotalFlow(conversation) {
+  return conversation.total_flow_ms ?? null;
+}
+
 function getHandleBy(conversation) {
   const value = conversation.handle_by ?? conversation.handleBy ?? [];
   if (Array.isArray(value)) return value.filter(Boolean).map((name) => String(name));
@@ -1160,6 +1419,19 @@ function formatDurationMs(ms) {
 
 function isFlowGroupOpen(label) {
   return openFlowLabels.value.includes(label);
+}
+
+function openAllFlowGroups() {
+  openFlowLabels.value = [
+    ...labelGroups.value.flatMap((group) =>
+      (group.labels ?? []).map((label) => label.name),
+    ),
+    ...unassigned.value.map((label) => label.name),
+  ];
+}
+
+function closeAllFlowGroups() {
+  openFlowLabels.value = [];
 }
 
 function toggleFlowGroup(label) {
