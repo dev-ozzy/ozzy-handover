@@ -522,7 +522,7 @@ import {
 } from "@headlessui/vue";
 import { useAuthStore } from "@/stores/auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE;
+const API_BASE = import.meta.env.VITE_API_BASE ?? `http://${window.location.hostname}:8000/api`;
 const auth = useAuthStore();
 const userName = computed(() => auth.user?.name ?? "-");
 const userRole = computed(() => auth.role ?? "-");

@@ -409,7 +409,7 @@ if (!auth.isLoggedIn) {
 
 const userRole = computed(() => auth.role ?? "-");
 
-const API_BASE = import.meta.env.VITE_API_BASE;
+const API_BASE = import.meta.env.VITE_API_BASE ?? `http://${window.location.hostname}:8000/api`;
 
 // Branch Options - Sesuai data Anda
 const branchOptions = [

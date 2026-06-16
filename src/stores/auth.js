@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import axios from "axios";
 import router from "@/router";
 
-const API_BASE = import.meta.env.VITE_API_BASE;
+const API_BASE = import.meta.env.VITE_API_BASE ?? `http://${window.location.hostname}:8000/api`;
 
 function loadUserFromStorage() {
   try {

@@ -291,27 +291,52 @@
 
     <!-- ══════════════════════════════════════════════ TAB: LABEL GROUPING ══ -->
     <template v-if="activeTab === 'labels'">
-      <div class="mb-4 flex items-center justify-between gap-3">
+      <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 class="text-lg font-semibold text-gray-800">Label Grouping</h2>
           <p class="text-sm text-gray-500">
-            Chat aktif dikelompokkan berdasarkan label Pancake.
+            {{ totalIndexed.toLocaleString('id') }} chat terindeks<span v-if="lastSync !== '-'"> · sync {{ lastSync }}</span>
           </p>
         </div>
-        <div class="flex items-center gap-2 text-sm text-gray-400">
-          Auto-refresh {{ countdownSec }}d
-          <span>{{ lastFetch }}</span>
+        <div class="flex items-center gap-2 text-sm">
           <button
-            @click="manualRefresh"
-            class="ml-1 text-xs text-blue-500 hover:underline"
+            @click="refreshLabeled"
+            :disabled="loadingLabeled"
+            class="rounded border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
           >
-            Refresh
+            {{ loadingLabeled ? "Memuat..." : "Refresh" }}
           </button>
         </div>
       </div>
 
+      <div v-if="labeledError" class="mb-3 text-sm text-red-600">⚠ {{ labeledError }}</div>
+
       <div v-if="labelReorderError" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {{ labelReorderError }}
+      </div>
+
+      <!-- ── Page selector pills ── -->
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          @click="labelFilterCabang = []"
+          class="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
+          :class="labelFilterCabang.length === 0
+            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400'"
+        >
+          Semua
+        </button>
+        <button
+          v-for="pageName in cabangFilterOptions"
+          :key="pageName"
+          @click="labelFilterCabang = [pageName]"
+          class="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
+          :class="labelFilterCabang.length === 1 && labelFilterCabang[0] === pageName
+            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400'"
+        >
+          {{ pageName }}
+        </button>
       </div>
 
       <div class="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-3 md:grid-cols-4">
@@ -330,8 +355,8 @@
         <MultiSelect
           v-model="labelFilterInformation"
           :options="informationFilterOptions"
-          label="By informasi"
-          placeholder="Pilih informasi..."
+          label="By sumber"
+          placeholder="Pilih sumber..."
         />
         <MultiSelect
           v-model="labelFilterHandleBy"
@@ -339,6 +364,14 @@
           label="By handle by (assignee)"
           placeholder="Pilih assignee..."
         />
+      </div>
+
+      <div
+        v-if="loadingLabeled && !labelGroups.length"
+        class="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-6 text-center text-sm text-blue-600"
+      >
+        <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"></div>
+        Memuat label grouping...
       </div>
 
       <section v-if="isSuperadmin && unassigned.length" class="mb-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50/60 p-4 shadow-sm">
@@ -356,19 +389,15 @@
             <span class="rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-600">
               {{ unassigned.length }} total
             </span>
-            <span class="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-700">
-              {{ unassignedOpen ? 'Buka' : 'Tutup' }}
-            </span>
+            <button
+              type="button"
+              @click="unassignedOpen = !unassignedOpen"
+              class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              {{ unassignedOpen ? 'Tutup' : 'Buka' }}
+            </button>
           </div>
         </div>
-
-        <button
-          type="button"
-          @click="unassignedOpen = !unassignedOpen"
-          class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-        >
-          {{ unassignedOpen ? 'Tutup' : 'Buka' }}
-        </button>
 
         <draggable
           v-if="unassignedOpen"
@@ -397,7 +426,7 @@
                   >⠿</span>
                   <span class="h-2.5 w-2.5 rounded-full" :class="getLabelDotClass(label)"></span>
                   <span>{{ label.name }}</span>
-                  <span class="text-gray-500">({{ getLabelItems(label).length }} chat)</span>
+                  <span class="text-gray-500">({{ getLabelCountText(label) }})</span>
                 </div>
                 <span class="rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-gray-700">
                   {{ isFlowGroupOpen(label.name) ? 'Tutup' : 'Buka' }}
@@ -405,7 +434,7 @@
               </button>
 
               <template v-if="isFlowGroupOpen(label.name)">
-                <div v-if="getLabelItems(label).length" class="mt-3 flex flex-col gap-2">
+                <div v-if="getLabelItems(label).length || isLabelLoading(label.name) || getLabelError(label.name)" class="mt-3 flex flex-col gap-2">
                   <div class="hidden md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4.5rem_3.5rem_4rem_4rem] gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
                     <div></div>
                     <div></div>
@@ -474,10 +503,10 @@
                       </div>
                       <div class="text-right">
                         <span
-                          v-if="getLabelDurationSince(c, label.pancake_tag_id)"
+                          v-if="getLabelDurationSince(c, label)"
                           class="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 whitespace-nowrap"
                         >
-                          {{ formatTimer(getLabelDurationSince(c, label.pancake_tag_id)) }}
+                          {{ formatTimer(getLabelDurationSince(c, label)) }}
                         </span>
                         <span v-else class="text-xs text-gray-400">-</span>
                       </div>
@@ -542,6 +571,20 @@
                       </div>
                     </div>
                   </div>
+                  <div v-if="isLabelLoading(label.name)" class="rounded-lg bg-white/70 py-3 text-center text-xs text-gray-400">
+                    Memuat chat...
+                  </div>
+                  <div v-if="getLabelError(label.name)" class="rounded-lg bg-red-50 py-3 text-center text-xs text-red-600">
+                    {{ getLabelError(label.name) }}
+                  </div>
+                  <button
+                    v-if="hasMoreLabelRows(label) && !isLabelLoading(label.name)"
+                    type="button"
+                    @click="fetchLabelRows(label, true)"
+                    class="self-center rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    Tampilkan lagi ({{ getLabelItems(label).length }}+)
+                  </button>
                 </div>
                 <div v-else class="mt-3 rounded-lg bg-gray-50 py-4 text-center text-xs text-gray-400">
                   Tidak ada chat untuk label ini.
@@ -623,14 +666,14 @@
                       >⠿</span>
                       <span class="h-2.5 w-2.5 rounded-full" :class="getLabelDotClass(label)"></span>
                       <span>{{ label.name }}</span>
-                      <span class="text-gray-500">({{ getLabelItems(label).length }} chat)</span>
+                      <span class="text-gray-500">({{ getLabelCountText(label) }})</span>
                     </div>
                     <span class="rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-gray-700">
                       {{ isFlowGroupOpen(label.name) ? 'Tutup' : 'Buka' }}
                     </span>
                   </button>
 
-                  <div v-if="isFlowGroupOpen(label.name) && getLabelItems(label).length" class="mt-3 flex flex-col gap-2">
+                  <div v-if="isFlowGroupOpen(label.name) && (getLabelItems(label).length || isLabelLoading(label.name) || getLabelError(label.name))" class="mt-3 flex flex-col gap-2">
                     <div class="hidden md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_5rem_4rem_4.5rem_3.5rem_4rem_4rem] gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
                       <div></div>
                       <div></div>
@@ -699,10 +742,10 @@
                         </div>
                         <div class="text-right">
                           <span
-                            v-if="getLabelDurationSince(c, label.pancake_tag_id)"
+                            v-if="getLabelDurationSince(c, label)"
                             class="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 whitespace-nowrap"
                           >
-                            {{ formatTimer(getLabelDurationSince(c, label.pancake_tag_id)) }}
+                            {{ formatTimer(getLabelDurationSince(c, label)) }}
                           </span>
                           <span v-else class="text-xs text-gray-400">-</span>
                         </div>
@@ -767,6 +810,20 @@
                         </div>
                       </div>
                     </div>
+                    <div v-if="isLabelLoading(label.name)" class="rounded-lg bg-white/70 py-3 text-center text-xs text-gray-400">
+                      Memuat chat...
+                    </div>
+                    <div v-if="getLabelError(label.name)" class="rounded-lg bg-red-50 py-3 text-center text-xs text-red-600">
+                      {{ getLabelError(label.name) }}
+                    </div>
+                    <button
+                      v-if="hasMoreLabelRows(label) && !isLabelLoading(label.name)"
+                      type="button"
+                      @click="fetchLabelRows(label, true)"
+                      class="self-center rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                    >
+                      Tampilkan lagi ({{ getLabelItems(label).length }}+)
+                    </button>
                   </div>
                   <div v-else-if="isFlowGroupOpen(label.name)" class="mt-3 rounded-lg bg-gray-50 py-4 text-center text-xs text-gray-400">
                     Tidak ada chat untuk label ini.
@@ -1061,7 +1118,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import axios from "axios";
 import {
   Dialog,
@@ -1091,6 +1148,11 @@ const pageErrors = ref([]);
 const tagDebug = ref([]);
 const tagErrors = ref([]);
 const loadingTags = ref(false);
+const loadingLabeled = ref(false);
+const labeledError = ref("");
+const totalIndexed = ref(0);
+const lastSync = ref("-");
+const labelRows = ref({});
 const refreshInterval = ref(30); // dari DB
 const countdownSec = ref(30);
 const lastFetch = ref("-");
@@ -1106,6 +1168,7 @@ const labelFilterHandleBy = ref([]);
 const labelGroups = ref([]);
 const informationLabels = ref([]);
 const unassigned = ref([]);
+const labelPageOptions = ref([]);
 const unassignedOpen = ref(false);
 const labelReorderSaving = ref(false);
 const labelReorderError = ref("");
@@ -1250,6 +1313,11 @@ const tagNameById = computed(() => {
       map[String(label.pancake_tag_id)] = label.name;
     }
   });
+  unassigned.value.forEach((label) => {
+    if (label.pancake_tag_id !== undefined && label.name) {
+      map[String(label.pancake_tag_id)] = label.name;
+    }
+  });
   collectTagObjects(tagDebug.value).forEach((tag) => {
     const id = tag.pancake_tag_id ?? tag.tag_id ?? tag.tagId ?? tag.id;
     const name = tag.name ?? tag.title ?? tag.text ?? tag.label ?? tag.tag_name;
@@ -1259,43 +1327,122 @@ const tagNameById = computed(() => {
 });
 
 function getLabelItems(label) {
-  const tagId = String(label.pancake_tag_id ?? "");
-  const items = sorted.value.filter((conversation) => {
-    if (!getConversationTagIds(conversation).includes(tagId)) return false;
-    if (
-      labelFilterFlow.value.length &&
-      !labelFilterFlow.value.includes(label.name)
-    ) return false;
-    if (
-      labelFilterInformation.value.length &&
-      !getInformationLabels(conversation).some((info) =>
-        labelFilterInformation.value.includes(info),
-      )
-    ) return false;
-    if (
-      labelFilterHandleBy.value.length &&
-      !getHandleBy(conversation).some((name) =>
-        labelFilterHandleBy.value.includes(name),
-      )
-    ) return false;
-    if (
-      labelFilterCabang.value.length &&
-      !labelFilterCabang.value.includes(conversation.page_name)
-    ) return false;
-    return true;
-  });
+  if (!labelMatchesFlowFilter(label)) return [];
+  return labelRows.value[label.name]?.items ?? [];
+}
 
-  // Sort: longest time in this flow label first, then longest unread first
-  return items.slice().sort((a, b) => {
-    const sinceA = getLabelDurationSince(a, tagId) ?? Infinity;
-    const sinceB = getLabelDurationSince(b, tagId) ?? Infinity;
-    if (sinceA !== sinceB) return sinceA - sinceB; // smaller since = older = longer duration
-    return a.unread_since - b.unread_since;
-  });
+function getLabelCount(label) {
+  if (!labelMatchesFlowFilter(label)) return 0;
+  return label.count ?? getLabelItems(label).length;
+}
+
+function getLabelCountText(label) {
+  if (!labelMatchesFlowFilter(label)) return "0 chat";
+  const total = getLabelCount(label);
+  return `${total} chat`;
 }
 
 function getSectionTotal(section) {
-  return (section.labels ?? []).reduce((sum, label) => sum + getLabelItems(label).length, 0);
+  return (section.labels ?? []).reduce((sum, label) => sum + getLabelCount(label), 0);
+}
+
+function labelMatchesFlowFilter(label) {
+  return !labelFilterFlow.value.length || labelFilterFlow.value.includes(label.name);
+}
+
+function getLabelState(labelName) {
+  return labelRows.value[labelName] ?? {
+    items: [],
+    loading: false,
+    error: "",
+    loaded: false,
+    hasMore: false,
+  };
+}
+
+function setLabelState(labelName, patch) {
+  labelRows.value = {
+    ...labelRows.value,
+    [labelName]: {
+      ...getLabelState(labelName),
+      ...patch,
+    },
+  };
+}
+
+function isLabelLoading(labelName) {
+  return getLabelState(labelName).loading;
+}
+
+function getLabelError(labelName) {
+  return getLabelState(labelName).error;
+}
+
+function hasMoreLabelRows(label) {
+  return labelMatchesFlowFilter(label) && getLabelState(label.name).hasMore;
+}
+
+function allFlowLabels() {
+  return [
+    ...labelGroups.value.flatMap((group) => group.labels ?? []),
+    ...unassigned.value,
+  ];
+}
+
+function findFlowLabel(labelName) {
+  return allFlowLabels().find((label) => label.name === labelName);
+}
+
+function labelFilterParams() {
+  const params = {};
+  if (labelFilterHandleBy.value.length) params.handle_by = labelFilterHandleBy.value.join(",");
+  if (labelFilterCabang.value.length) params.page_name = labelFilterCabang.value.join(",");
+  if (labelFilterInformation.value.length) params.information_label = labelFilterInformation.value.join(",");
+  return params;
+}
+
+async function fetchLabelRows(label, append = false) {
+  if (!label?.name || !labelMatchesFlowFilter(label)) return;
+
+  const state = getLabelState(label.name);
+  if (state.loading) return;
+
+  const offset = append ? state.items.length : 0;
+  setLabelState(label.name, { loading: true, error: "" });
+
+  try {
+    const { data } = await axios.get(`${API_BASE}/wa-monitor/label-conversations`, {
+      params: {
+        label: label.name,
+        limit: 50,
+        offset,
+        ...labelFilterParams(),
+      },
+    });
+    const rows = data.data ?? [];
+    const items = append ? [...state.items, ...rows] : rows;
+    setLabelState(label.name, {
+      items,
+      loading: false,
+      error: "",
+      loaded: true,
+      hasMore: Boolean(data.meta?.has_more),
+    });
+    pageErrors.value = data.errors ?? [];
+  } catch (err) {
+    setLabelState(label.name, {
+      loading: false,
+      error: err.response?.data?.error ?? err.message ?? "Gagal mengambil chat label.",
+    });
+  }
+}
+
+async function reloadOpenLabels() {
+  const labels = openFlowLabels.value
+    .map((labelName) => findFlowLabel(labelName))
+    .filter(Boolean);
+
+  await Promise.all(labels.map((label) => fetchLabelRows(label)));
 }
 
 const labelFlowTotal = computed(() =>
@@ -1311,6 +1458,11 @@ const informationFilterOptions = computed(() => {
   sorted.value.forEach((conversation) => {
     getInformationLabels(conversation).forEach((label) => labels.add(label));
   });
+  Object.values(labelRows.value).forEach((state) => {
+    (state.items ?? []).forEach((conversation) => {
+      getInformationLabels(conversation).forEach((label) => labels.add(label));
+    });
+  });
   informationLabels.value.forEach((label) => labels.add(label.name));
   return [...labels].sort((a, b) => a.localeCompare(b));
 });
@@ -1320,10 +1472,27 @@ const handleByFilterOptions = computed(() => {
   sorted.value.forEach((conversation) => {
     getHandleBy(conversation).forEach((name) => names.add(name));
   });
+  Object.values(labelRows.value).forEach((state) => {
+    (state.items ?? []).forEach((conversation) => {
+      getHandleBy(conversation).forEach((name) => names.add(name));
+    });
+  });
   return [...names].sort((a, b) => a.localeCompare(b));
 });
 
 const cabangFilterOptions = computed(() => {
+  if (waPages.value.length) {
+    return waPages.value
+      .filter((page) => page.is_active)
+      .map((page) => page.name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  if (labelPageOptions.value.length) {
+    return [...labelPageOptions.value].sort((a, b) => a.localeCompare(b));
+  }
+
   const pages = new Set();
   sorted.value.forEach((conversation) => {
     if (conversation.page_name) pages.add(conversation.page_name);
@@ -1362,7 +1531,18 @@ function getTagLabel(tag) {
 }
 
 function getConversationLabels(conversation) {
-  return getConversationTagIds(conversation).map((tag) => getTagLabel(tag));
+  const names = new Set();
+  (conversation.labels ?? []).forEach((label) => {
+    if (label.name) names.add(String(label.name));
+  });
+  const tagNames = conversation.tag_names ?? conversation.tagNames ?? {};
+  if (tagNames && typeof tagNames === "object" && !Array.isArray(tagNames)) {
+    Object.values(tagNames).forEach((name) => {
+      if (name) names.add(String(name));
+    });
+  }
+  getConversationTagIds(conversation).forEach((tag) => names.add(getTagLabel(tag)));
+  return [...names];
 }
 
 function getInformationLabels(conversation) {
@@ -1371,11 +1551,15 @@ function getInformationLabels(conversation) {
   );
 }
 
-function getLabelDurationSince(conversation, tagId) {
+function getLabelDurationSince(conversation, label) {
   const durations = conversation.label_durations ?? conversation.labelDurations ?? [];
   if (!Array.isArray(durations)) return null;
+  const tagId = typeof label === "object" ? label.pancake_tag_id : label;
+  const labelName = typeof label === "object" ? label.name : null;
   const duration = durations.find(
-    (item) => String(item.pancake_tag_id) === String(tagId),
+    (item) =>
+      String(item.pancake_tag_id) === String(tagId) ||
+      (labelName && item.name === labelName),
   );
   return duration?.since ?? null;
 }
@@ -1428,6 +1612,9 @@ function openAllFlowGroups() {
     ),
     ...unassigned.value.map((label) => label.name),
   ];
+  allFlowLabels()
+    .filter((label) => labelMatchesFlowFilter(label))
+    .forEach((label) => fetchLabelRows(label));
 }
 
 function closeAllFlowGroups() {
@@ -1435,9 +1622,15 @@ function closeAllFlowGroups() {
 }
 
 function toggleFlowGroup(label) {
-  openFlowLabels.value = isFlowGroupOpen(label)
+  const wasOpen = isFlowGroupOpen(label);
+  openFlowLabels.value = wasOpen
     ? openFlowLabels.value.filter((item) => item !== label)
     : [...openFlowLabels.value, label];
+
+  if (!wasOpen) {
+    const item = findFlowLabel(label);
+    if (item) fetchLabelRows(item);
+  }
 }
 
 function getLabelColorKey(label) {
@@ -1512,16 +1705,34 @@ async function fetchPancakeTags() {
 }
 
 async function fetchLabelConfig() {
+  loadingLabeled.value = true;
+  labeledError.value = "";
   try {
-    const { data } = await axios.get(`${API_BASE}/wa-monitor/labels`);
+    const { data } = await axios.get(`${API_BASE}/wa-monitor/label-summary`, {
+      params: labelFilterParams(),
+    });
     labelGroups.value = data.groups ?? [];
     informationLabels.value = data.information_labels ?? [];
     unassigned.value = data.unassigned ?? [];
+    labelPageOptions.value = data.page_names ?? [];
+    totalIndexed.value = data.total_indexed ?? 0;
+    lastSync.value = data.last_sync
+      ? new Date(data.last_sync).toLocaleTimeString("id-ID")
+      : "-";
   } catch (err) {
-    tagErrors.value = [
-      err.response?.data?.error ?? err.message ?? "Gagal mengambil label monitor.",
-    ];
+    labeledError.value =
+      err.response?.data?.error ?? err.message ?? "Gagal mengambil label monitor.";
+  } finally {
+    loadingLabeled.value = false;
   }
+}
+
+async function refreshLabeled() {
+  labelRows.value = {};
+  historyOpen.value = {};
+  historyData.value = {};
+  await fetchLabelConfig();
+  await reloadOpenLabels();
 }
 
 async function saveLabelReorder() {
@@ -1575,18 +1786,18 @@ function startCountdown() {
   countdownSec.value = refreshInterval.value;
   if (countdownTimer) clearInterval(countdownTimer);
   countdownTimer = setInterval(() => {
+    if (activeTab.value !== "monitor") return;
     countdownSec.value--;
     if (countdownSec.value <= 0) {
       countdownSec.value = refreshInterval.value;
       fetchConversations();
-      fetchLabelConfig();
-      fetchPancakeTags();
     }
   }, 1000);
 }
 
 /* ── Fetch conversations ── */
 async function fetchConversations() {
+  if (activeTab.value !== "monitor") return;
   loadingConv.value = true;
   convError.value = "";
   pageErrors.value = [];
@@ -1606,9 +1817,7 @@ async function fetchConversations() {
 
 function manualRefresh() {
   countdownSec.value = refreshInterval.value;
-  fetchConversations();
-  fetchLabelConfig();
-  fetchPancakeTags();
+  if (activeTab.value === "monitor") fetchConversations();
 }
 
 /* ── Settings ── */
@@ -1689,7 +1898,7 @@ async function submitForm() {
     }
     formVisible.value = false;
     fetchPages();
-    fetchConversations();
+    if (activeTab.value === "monitor") fetchConversations();
   } catch (err) {
     if (err.response?.status === 422) {
       const errs = err.response.data.errors ?? {};
@@ -1708,19 +1917,53 @@ async function deletePage(page) {
   try {
     await axios.delete(`${API_BASE}/wa-monitor/pages/${page.id}`);
     fetchPages();
-    fetchConversations();
+    if (activeTab.value === "monitor") fetchConversations();
   } catch {
     alert("Gagal menghapus.");
   }
 }
 
+watch(
+  [labelFilterFlow, labelFilterCabang, labelFilterInformation, labelFilterHandleBy],
+  () => {
+    if (activeTab.value !== "labels") return;
+    fetchLabelConfig();
+    reloadOpenLabels();
+  },
+  { deep: true },
+);
+
+watch(activeTab, (tab) => {
+  if (tab === "monitor") {
+    fetchConversations();
+    startCountdown();
+    return;
+  }
+
+  if (countdownTimer) clearInterval(countdownTimer);
+
+  if (tab === "labels") {
+    fetchLabelConfig();
+    fetchPancakeTags();
+    reloadOpenLabels();
+  }
+
+  if (tab === "pages") {
+    fetchPages();
+  }
+});
+
 /* ── Lifecycle ── */
 onMounted(() => {
   fetchSettings();
-  fetchLabelConfig();
-  fetchConversations();
-  fetchPancakeTags();
-  fetchPages();
+  if (activeTab.value === "monitor") {
+    fetchConversations();
+  } else if (activeTab.value === "labels") {
+    fetchLabelConfig();
+    fetchPancakeTags();
+  } else if (activeTab.value === "pages") {
+    fetchPages();
+  }
   startTick();
 });
 

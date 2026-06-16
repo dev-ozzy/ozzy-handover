@@ -76,7 +76,7 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE;
+const API_BASE = import.meta.env.VITE_API_BASE ?? `http://${window.location.hostname}:8000/api`;
 const auth = useAuthStore();
 
 const userName = computed(() => auth.user?.name ?? "-");
