@@ -878,11 +878,8 @@
               >
                 Nomor WA
               </th>
-              <th
-                class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide"
-              >
-                Tipe
-              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pancake ID</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipe</th>
               <th
                 class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide"
               >
@@ -902,12 +899,12 @@
           </thead>
           <tbody class="divide-y divide-gray-100 bg-white">
             <tr v-if="loadingPages">
-              <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+              <td colspan="7" class="px-4 py-8 text-center text-gray-400">
                 Memuat...
               </td>
             </tr>
             <tr v-else-if="waPages.length === 0">
-              <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+              <td colspan="7" class="px-4 py-8 text-center text-gray-400">
                 Belum ada data.
               </td>
             </tr>
@@ -919,6 +916,9 @@
               <td class="px-4 py-3 font-medium text-gray-800">{{ p.name }}</td>
               <td class="px-4 py-3 font-mono text-xs text-gray-600">
                 {{ p.phone_number }}
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                {{ p.pancake_page_id || p.page_id || "-" }}
               </td>
               <td class="px-4 py-3 text-gray-600">{{ p.type }}</td>
               <td class="px-4 py-3 text-center font-mono text-xs text-gray-600">
@@ -1277,16 +1277,27 @@
                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <p class="text-xs text-gray-400 mt-1">
-                      Cukup angka saja. Official →
-                      <code class="bg-gray-100 px-1 rounded">waba_xxx</code>
-                      &nbsp;|&nbsp; Non-Official →
-                      <code class="bg-gray-100 px-1 rounded">wa_xxx@c.us</code>
+                      Cukup angka saja untuk display. Pancake ID bisa diisi otomatis dari API.
                     </p>
                     <p
                       v-if="formErrors.phone_number"
                       class="text-xs text-red-500 mt-1"
                     >
                       {{ formErrors.phone_number }}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Pancake Page ID</label>
+                    <input
+                      v-model="form.pancake_page_id"
+                      type="text"
+                      placeholder="waba_xxx atau wa_c.us@628xxx"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p class="text-xs text-gray-400 mt-1">ID asli dari Pancake API. Kosongkan jika belum tahu.</p>
+                    <p v-if="formErrors.pancake_page_id" class="text-xs text-red-500 mt-1">
+                      {{ formErrors.pancake_page_id }}
                     </p>
                   </div>
 
@@ -1451,6 +1462,7 @@ const editingId = ref(null);
 const defaultForm = () => ({
   name: "",
   phone_number: "",
+  pancake_page_id: "",
   type: "",
   is_active: true,
   work_start: "09:00",
@@ -2172,6 +2184,7 @@ function openForm(page = null) {
     form.value = {
       name: page.name,
       phone_number: page.phone_number,
+      pancake_page_id: page.pancake_page_id ?? "",
       type: page.type,
       is_active: page.is_active,
       work_start: page.work_start?.slice(0, 5) ?? "08:00",
