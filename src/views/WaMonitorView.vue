@@ -45,6 +45,18 @@
       >
         ⚙️ Master WA Pages
       </button>
+      <button
+        v-if="isSuperadmin"
+        @click="activeTab = 'tag-trigger'"
+        class="px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px"
+        :class="
+          activeTab === 'tag-trigger'
+            ? 'border-blue-600 text-blue-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        "
+      >
+        🎯 Tag Trigger
+      </button>
     </div>
 
     <!-- ══════════════════════════════════════════════ TAB: MONITOR ══ -->
@@ -945,7 +957,269 @@
         </table>
       </div>
     </template>
+
+    <!-- ══════════════════════════════════════════════ TAB: TAG TRIGGER ══ -->
+    <template v-if="activeTab === 'tag-trigger' && isSuperadmin">
+      <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">Tag Trigger</h2>
+          <p class="text-sm text-gray-500">
+            Aturan auto-tag berdasarkan teks pesan terakhir. Dijalankan tiap 5 menit.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            @click="fetchAutoTagRules"
+            :disabled="loadingRules"
+            class="rounded border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+          >
+            {{ loadingRules ? "Memuat..." : "Refresh" }}
+          </button>
+          <button
+            @click="openRuleForm()"
+            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium"
+          >
+            + Tambah Rule
+          </button>
+        </div>
+      </div>
+
+      <div v-if="rulesError" class="mb-3 text-sm text-red-600">⚠ {{ rulesError }}</div>
+
+      <div class="overflow-x-auto rounded-xl border border-gray-200">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide w-16">Urutan</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tag</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trigger</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Contains</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Not Contains</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Sumber</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Aksi</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            <tr v-if="loadingRules && rules.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center text-gray-400">Memuat...</td>
+            </tr>
+            <tr v-else-if="rules.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center text-gray-400">Belum ada rule.</td>
+            </tr>
+            <tr v-for="r in rules" :key="r.id" class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3 text-center text-gray-500 font-mono text-xs">{{ r.sort_order }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                  {{ r.label || `Tag ${r.pancake_tag_id}` }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-gray-700">
+                <code v-if="r.trigger_text" class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ r.trigger_text }}</code>
+                <span v-else class="text-gray-400 text-xs">-</span>
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">
+                {{ r.contains_any?.length ? r.contains_any.join(", ") : "-" }}
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">
+                {{ r.not_contains_any?.length ? r.not_contains_any.join(", ") : "-" }}
+              </td>
+              <td class="px-4 py-3 text-center text-xs text-gray-600">{{ r.source_chat }}</td>
+              <td class="px-4 py-3 text-center">
+                <span
+                  class="text-xs px-2 py-0.5 rounded-full font-medium"
+                  :class="r.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                >
+                  {{ r.enabled ? "Aktif" : "Nonaktif" }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <div class="flex justify-center gap-3">
+                  <button @click="openRuleForm(r)" class="text-xs text-blue-600 hover:underline font-medium">Edit</button>
+                  <button @click="deleteRule(r)" class="text-xs text-red-500 hover:underline font-medium">Hapus</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </div>
+
+  <!-- ── Modal Tag Trigger Rule ── -->
+  <TransitionRoot as="template" :show="ruleFormVisible">
+    <Dialog class="relative z-10" @close="ruleFormVisible = false">
+      <TransitionChild
+        as="template"
+        enter="ease-out duration-300"
+        enter-from="opacity-0"
+        enter-to="opacity-100"
+        leave="ease-in duration-200"
+        leave-from="opacity-100"
+        leave-to="opacity-0"
+      >
+        <div class="fixed inset-0 bg-gray-500/75 transition-opacity" />
+      </TransitionChild>
+
+      <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+          <TransitionChild
+            as="template"
+            enter="ease-out duration-300"
+            enter-from="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            enter-to="opacity-100 translate-y-0 sm:scale-100"
+            leave="ease-in duration-200"
+            leave-from="opacity-100 translate-y-0 sm:scale-100"
+            leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+          >
+            <DialogPanel
+              class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg"
+            >
+              <div class="bg-white px-6 py-6">
+                <DialogTitle as="h3" class="text-lg font-semibold text-gray-900 mb-5 text-center">
+                  {{ ruleFormMode === "create" ? "Tambah Tag Trigger" : "Edit Tag Trigger" }}
+                </DialogTitle>
+
+                <div class="flex flex-col space-y-4">
+                  <!-- Tag -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Tag</label>
+                    <select
+                      v-model.number="ruleForm.wa_monitor_label_id"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option :value="null" disabled>Pilih tag...</option>
+                      <option v-for="l in ruleLabels" :key="l.id" :value="l.id">
+                        {{ l.name }}
+                      </option>
+                    </select>
+                    <p v-if="ruleFormErrors.wa_monitor_label_id" class="text-xs text-red-500 mt-1">
+                      {{ ruleFormErrors.wa_monitor_label_id }}
+                    </p>
+                  </div>
+
+                  <!-- Trigger text -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Trigger Text</label>
+                    <input
+                      v-model="ruleForm.trigger_text"
+                      type="text"
+                      placeholder="izin followup terkait dp"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p class="text-xs text-gray-400 mt-1">
+                      Cocokkan jika pesan mengandung teks ini (case-insensitive).
+                    </p>
+                  </div>
+
+                  <!-- Contains any -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Contains Any (opsional)</label>
+                    <textarea
+                      v-model="containsAnyText"
+                      rows="2"
+                      placeholder="Satu frasa per baris"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    ></textarea>
+                    <p class="text-xs text-gray-400 mt-1">Cocok jika mengandung salah satu frasa. Satu per baris.</p>
+                  </div>
+
+                  <!-- Not contains any -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Not Contains Any (opsional)</label>
+                    <textarea
+                      v-model="notContainsAnyText"
+                      rows="2"
+                      placeholder="Satu frasa per baris"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    ></textarea>
+                    <p class="text-xs text-gray-400 mt-1">Batalkan match jika mengandung salah satu frasa.</p>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <!-- Source chat -->
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Sumber Chat</label>
+                      <select
+                        v-model="ruleForm.source_chat"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="any">Semua</option>
+                        <option value="customer">Customer</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+
+                    <!-- Match scope -->
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Match Scope</label>
+                      <select
+                        v-model="ruleForm.match_scope"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="latest_any">Latest Any</option>
+                        <option value="latest_customer">Latest Customer</option>
+                        <option value="latest_outbound">Latest Outbound</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <!-- Sort order -->
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Urutan</label>
+                      <input
+                        v-model.number="ruleForm.sort_order"
+                        type="number"
+                        min="0"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <!-- Enabled -->
+                    <div class="flex items-end pb-2">
+                      <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="ruleForm.enabled" type="checkbox" class="w-4 h-4" />
+                        Aktif
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Note -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Catatan (opsional)</label>
+                    <input
+                      v-model="ruleForm.condition_note"
+                      type="text"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="flex gap-2 pt-1">
+                    <button
+                      @click="ruleFormVisible = false"
+                      :disabled="ruleFormLoading"
+                      class="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      @click="submitRuleForm"
+                      :disabled="ruleFormLoading"
+                      class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {{ ruleFormLoading ? "Menyimpan..." : ruleFormMode === "create" ? "Simpan" : "Update" }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </div>
+    </Dialog>
+  </TransitionRoot>
 
   <!-- ── Modal Form ── -->
   <TransitionRoot as="template" :show="formVisible">
@@ -1197,6 +1471,30 @@ const defaultForm = () => ({
   work_end: "17:00",
 });
 const form = ref(defaultForm());
+
+/* ── Tag Trigger (auto-tag rules) state ── */
+const rules = ref([]);
+const ruleLabels = ref([]);
+const loadingRules = ref(false);
+const rulesError = ref("");
+const ruleFormVisible = ref(false);
+const ruleFormMode = ref("create");
+const ruleFormLoading = ref(false);
+const ruleFormErrors = ref({});
+const editingRuleId = ref(null);
+const containsAnyText = ref("");
+const notContainsAnyText = ref("");
+
+const defaultRuleForm = () => ({
+  wa_monitor_label_id: null,
+  trigger_text: "",
+  source_chat: "any",
+  match_scope: "latest_any",
+  sort_order: 0,
+  enabled: true,
+  condition_note: "",
+});
+const ruleForm = ref(defaultRuleForm());
 
 /* ── Helpers ── */
 function getInitials(name) {
@@ -1923,6 +2221,102 @@ async function deletePage(page) {
   }
 }
 
+/* ── Tag Trigger (auto-tag rules) ── */
+async function fetchAutoTagRules() {
+  if (!isSuperadmin.value) return;
+  loadingRules.value = true;
+  rulesError.value = "";
+  try {
+    const { data } = await axios.get(`${API_BASE}/wa-monitor/auto-tag-rules`);
+    rules.value = data.rules ?? [];
+    ruleLabels.value = data.labels ?? [];
+  } catch (err) {
+    rulesError.value =
+      err.response?.data?.error ?? err.message ?? "Gagal mengambil rule.";
+  } finally {
+    loadingRules.value = false;
+  }
+}
+
+function linesToList(text) {
+  return (text ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
+function openRuleForm(rule = null) {
+  ruleFormErrors.value = {};
+  if (rule) {
+    ruleFormMode.value = "edit";
+    editingRuleId.value = rule.id;
+    ruleForm.value = {
+      wa_monitor_label_id: rule.wa_monitor_label_id ?? null,
+      trigger_text: rule.trigger_text ?? "",
+      source_chat: rule.source_chat ?? "any",
+      match_scope: rule.match_scope ?? "latest_any",
+      sort_order: rule.sort_order ?? 0,
+      enabled: rule.enabled ?? true,
+      condition_note: rule.condition_note ?? "",
+    };
+    containsAnyText.value = (rule.contains_any ?? []).join("\n");
+    notContainsAnyText.value = (rule.not_contains_any ?? []).join("\n");
+  } else {
+    ruleFormMode.value = "create";
+    editingRuleId.value = null;
+    ruleForm.value = defaultRuleForm();
+    containsAnyText.value = "";
+    notContainsAnyText.value = "";
+  }
+  ruleFormVisible.value = true;
+}
+
+async function submitRuleForm() {
+  ruleFormErrors.value = {};
+  ruleFormLoading.value = true;
+  try {
+    const payload = {
+      ...ruleForm.value,
+      trigger_text: ruleForm.value.trigger_text?.trim() || null,
+      condition_note: ruleForm.value.condition_note?.trim() || null,
+      contains_any: linesToList(containsAnyText.value),
+      not_contains_any: linesToList(notContainsAnyText.value),
+    };
+    if (ruleFormMode.value === "create") {
+      await axios.post(`${API_BASE}/wa-monitor/auto-tag-rules`, payload);
+    } else {
+      await axios.put(
+        `${API_BASE}/wa-monitor/auto-tag-rules/${editingRuleId.value}`,
+        payload,
+      );
+    }
+    ruleFormVisible.value = false;
+    fetchAutoTagRules();
+  } catch (err) {
+    if (err.response?.status === 422) {
+      const errs = err.response.data.errors ?? {};
+      ruleFormErrors.value = Object.fromEntries(
+        Object.entries(errs).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]),
+      );
+    } else {
+      rulesError.value =
+        err.response?.data?.error ?? err.message ?? "Gagal menyimpan rule.";
+    }
+  } finally {
+    ruleFormLoading.value = false;
+  }
+}
+
+async function deleteRule(rule) {
+  if (!confirm(`Hapus rule untuk tag "${rule.label ?? rule.pancake_tag_id}"?`)) return;
+  try {
+    await axios.delete(`${API_BASE}/wa-monitor/auto-tag-rules/${rule.id}`);
+    fetchAutoTagRules();
+  } catch {
+    alert("Gagal menghapus rule.");
+  }
+}
+
 watch(
   [labelFilterFlow, labelFilterCabang, labelFilterInformation, labelFilterHandleBy],
   () => {
@@ -1951,6 +2345,10 @@ watch(activeTab, (tab) => {
   if (tab === "pages") {
     fetchPages();
   }
+
+  if (tab === "tag-trigger") {
+    fetchAutoTagRules();
+  }
 });
 
 /* ── Lifecycle ── */
@@ -1963,6 +2361,8 @@ onMounted(() => {
     fetchPancakeTags();
   } else if (activeTab.value === "pages") {
     fetchPages();
+  } else if (activeTab.value === "tag-trigger") {
+    fetchAutoTagRules();
   }
   startTick();
 });
