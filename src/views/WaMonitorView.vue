@@ -1024,7 +1024,7 @@
               <td class="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">
                 {{ r.not_contains_any?.length ? r.not_contains_any.join(", ") : "-" }}
               </td>
-              <td class="px-4 py-3 text-center text-xs text-gray-600">{{ r.source_chat }}</td>
+              <td class="px-4 py-3 text-center text-xs text-gray-600">{{ ruleSourceChat(r) }}</td>
               <td class="px-4 py-3 text-center">
                 <span
                   class="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -1136,32 +1136,18 @@
                     <p class="text-xs text-gray-400 mt-1">Batalkan match jika mengandung salah satu frasa.</p>
                   </div>
 
-                  <div class="grid grid-cols-2 gap-3">
+                  <div>
                     <!-- Source chat -->
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Sumber Chat</label>
-                      <select
-                        v-model="ruleForm.source_chat"
-                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      >
-                        <option value="any">Semua</option>
-                        <option value="customer">Customer</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-
-                    <!-- Match scope -->
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Match Scope</label>
-                      <select
-                        v-model="ruleForm.match_scope"
-                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      >
-                        <option value="latest_any">Latest Any</option>
-                        <option value="latest_customer">Latest Customer</option>
-                        <option value="latest_outbound">Latest Outbound</option>
-                      </select>
-                    </div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Sumber Chat</label>
+                    <select
+                      v-model="ruleForm.source_chat"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="any">Semua</option>
+                      <option value="customer">Customer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <p class="text-xs text-gray-400 mt-1">Pilih pesan dari siapa yang akan dicek untuk trigger.</p>
                   </div>
 
                   <div class="grid grid-cols-2 gap-3">
@@ -1497,6 +1483,23 @@ const defaultRuleForm = () => ({
 const ruleForm = ref(defaultRuleForm());
 
 /* ── Helpers ── */
+function sourceChatToMatchScope(sourceChat) {
+  if (sourceChat === "customer") return "latest_customer";
+  if (sourceChat === "admin") return "latest_outbound";
+  return "latest_any";
+}
+
+function matchScopeToSourceChat(matchScope) {
+  if (matchScope === "latest_customer") return "customer";
+  if (matchScope === "latest_outbound") return "admin";
+  return "any";
+}
+
+function ruleSourceChat(rule) {
+  if (rule?.source_chat && rule.source_chat !== "any") return rule.source_chat;
+  return matchScopeToSourceChat(rule?.match_scope);
+}
+
 function getInitials(name) {
   return (name || "?")
     .split(" ")
@@ -2253,8 +2256,8 @@ function openRuleForm(rule = null) {
     ruleForm.value = {
       wa_monitor_label_id: rule.wa_monitor_label_id ?? null,
       trigger_text: rule.trigger_text ?? "",
-      source_chat: rule.source_chat ?? "any",
-      match_scope: rule.match_scope ?? "latest_any",
+      source_chat: ruleSourceChat(rule),
+      match_scope: sourceChatToMatchScope(ruleSourceChat(rule)),
       sort_order: rule.sort_order ?? 0,
       enabled: rule.enabled ?? true,
       condition_note: rule.condition_note ?? "",
@@ -2277,6 +2280,7 @@ async function submitRuleForm() {
   try {
     const payload = {
       ...ruleForm.value,
+      match_scope: sourceChatToMatchScope(ruleForm.value.source_chat),
       trigger_text: ruleForm.value.trigger_text?.trim() || null,
       condition_note: ruleForm.value.condition_note?.trim() || null,
       contains_any: linesToList(containsAnyText.value),
