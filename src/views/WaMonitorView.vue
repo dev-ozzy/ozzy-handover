@@ -991,11 +991,11 @@
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
               <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide w-16">Urutan</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Aksi</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tag</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trigger</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Contains</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Not Contains</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Hapus Tag</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Sumber</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Aksi</th>
@@ -1010,14 +1010,6 @@
             </tr>
             <tr v-for="r in rules" :key="r.id" class="hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3 text-center text-gray-500 font-mono text-xs">{{ r.sort_order }}</td>
-              <td class="px-4 py-3 text-center">
-                <span
-                  class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                  :class="r.action === 'remove' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'"
-                >
-                  {{ r.action === "remove" ? "Hapus" : "Tambah" }}
-                </span>
-              </td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
                   {{ r.label || `Tag ${r.pancake_tag_id}` }}
@@ -1032,6 +1024,18 @@
               </td>
               <td class="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">
                 {{ r.not_contains_any?.length ? r.not_contains_any.join(", ") : "-" }}
+              </td>
+              <td class="px-4 py-3">
+                <div v-if="r.removes_label_ids?.length" class="flex flex-wrap gap-1">
+                  <span
+                    v-for="labelId in r.removes_label_ids"
+                    :key="labelId"
+                    class="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700"
+                  >
+                    {{ ruleLabelName(labelId) }}
+                  </span>
+                </div>
+                <span v-else class="text-gray-400 text-xs">-</span>
               </td>
               <td class="px-4 py-3 text-center text-xs text-gray-600">{{ ruleSourceChat(r) }}</td>
               <td class="px-4 py-3 text-center">
@@ -1090,34 +1094,9 @@
                 </DialogTitle>
 
                 <div class="flex flex-col space-y-4">
-                  <!-- Action -->
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1.5">Aksi</label>
-                    <div class="grid grid-cols-2 rounded-lg bg-gray-100 p-1">
-                      <button
-                        type="button"
-                        @click="ruleForm.action = 'add'"
-                        class="rounded-md px-3 py-2 text-sm font-semibold transition-colors"
-                        :class="ruleForm.action === 'add' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-                      >
-                        Tambah Tag
-                      </button>
-                      <button
-                        type="button"
-                        @click="ruleForm.action = 'remove'"
-                        class="rounded-md px-3 py-2 text-sm font-semibold transition-colors"
-                        :class="ruleForm.action === 'remove' ? 'bg-white text-red-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-                      >
-                        Hapus Tag
-                      </button>
-                    </div>
-                  </div>
-
                   <!-- Tag -->
                   <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">
-                      Tag yang akan {{ ruleForm.action === "remove" ? "dihapus" : "ditambahkan" }}
-                    </label>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Tag</label>
                     <select
                       v-model.number="ruleForm.wa_monitor_label_id"
                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -1130,6 +1109,24 @@
                     <p v-if="ruleFormErrors.wa_monitor_label_id" class="text-xs text-red-500 mt-1">
                       {{ ruleFormErrors.wa_monitor_label_id }}
                     </p>
+                  </div>
+
+                  <!-- Remove tags -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Hapus Tag (opsional)</label>
+                    <div class="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-1">
+                      <label
+                        v-for="l in removableRuleLabels"
+                        :key="l.id"
+                        class="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <input v-model="ruleForm.removes_label_ids" type="checkbox" :value="l.id" class="w-4 h-4" />
+                        {{ l.name }}
+                      </label>
+                      <p v-if="removableRuleLabels.length === 0" class="px-2 py-1 text-xs text-gray-400">Tidak ada tag lain.</p>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">Tag terpilih dihapus setelah tag utama berhasil ditambahkan.</p>
+                    <p v-if="ruleFormErrors.removes_label_ids" class="text-xs text-red-500 mt-1">{{ ruleFormErrors.removes_label_ids }}</p>
                   </div>
 
                   <!-- Trigger text -->
@@ -1519,7 +1516,7 @@ const notContainsAnyText = ref("");
 
 const defaultRuleForm = () => ({
   wa_monitor_label_id: null,
-  action: "add",
+  removes_label_ids: [],
   trigger_text: "",
   source_chat: "any",
   match_scope: "latest_any",
@@ -1528,6 +1525,9 @@ const defaultRuleForm = () => ({
   condition_note: "",
 });
 const ruleForm = ref(defaultRuleForm());
+const removableRuleLabels = computed(() =>
+  ruleLabels.value.filter((label) => label.id !== ruleForm.value.wa_monitor_label_id),
+);
 
 /* ── Helpers ── */
 function sourceChatToMatchScope(sourceChat) {
@@ -1545,6 +1545,10 @@ function matchScopeToSourceChat(matchScope) {
 function ruleSourceChat(rule) {
   if (rule?.source_chat && rule.source_chat !== "any") return rule.source_chat;
   return matchScopeToSourceChat(rule?.match_scope);
+}
+
+function ruleLabelName(labelId) {
+  return ruleLabels.value.find((label) => label.id === labelId)?.name ?? `Tag ${labelId}`;
 }
 
 function getInitials(name) {
@@ -2303,7 +2307,7 @@ function openRuleForm(rule = null) {
     editingRuleId.value = rule.id;
     ruleForm.value = {
       wa_monitor_label_id: rule.wa_monitor_label_id ?? null,
-      action: rule.action === "remove" ? "remove" : "add",
+      removes_label_ids: [...(rule.removes_label_ids ?? [])],
       trigger_text: rule.trigger_text ?? "",
       source_chat: ruleSourceChat(rule),
       match_scope: sourceChatToMatchScope(ruleSourceChat(rule)),
@@ -2334,6 +2338,9 @@ async function submitRuleForm() {
       condition_note: ruleForm.value.condition_note?.trim() || null,
       contains_any: linesToList(containsAnyText.value),
       not_contains_any: linesToList(notContainsAnyText.value),
+      removes_label_ids: ruleForm.value.removes_label_ids.filter(
+        (labelId) => labelId !== ruleForm.value.wa_monitor_label_id,
+      ),
     };
     if (ruleFormMode.value === "create") {
       await axios.post(`${API_BASE}/wa-monitor/auto-tag-rules`, payload);
