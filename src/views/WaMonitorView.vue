@@ -34,7 +34,7 @@
         🏷️ Label Grouping
       </button>
       <button
-        v-if="isSuperadmin"
+        v-if="canManageWaRules"
         @click="activeTab = 'pages'"
         class="px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px"
         :class="
@@ -46,7 +46,7 @@
         ⚙️ Master WA Pages
       </button>
       <button
-        v-if="isSuperadmin"
+        v-if="canManageWaRules"
         @click="activeTab = 'tag-trigger'"
         class="px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px"
         :class="
@@ -851,7 +851,7 @@
     </template>
 
     <!-- ══════════════════════════════════════════════ TAB: MASTER PAGES ══ -->
-    <template v-if="activeTab === 'pages' && isSuperadmin">
+    <template v-if="activeTab === 'pages' && canManageWaRules">
       <div class="mb-4 flex items-center justify-between">
         <p class="text-sm text-gray-500">
           Kelola nomor WA yang dimonitor beserta jam kerjanya.
@@ -959,7 +959,7 @@
     </template>
 
     <!-- ══════════════════════════════════════════════ TAB: TAG TRIGGER ══ -->
-    <template v-if="activeTab === 'tag-trigger' && isSuperadmin">
+    <template v-if="activeTab === 'tag-trigger' && canManageWaRules">
       <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 class="text-lg font-semibold text-gray-800">Tag Trigger</h2>
@@ -1438,6 +1438,9 @@ const auth = useAuthStore();
 
 const userName = computed(() => auth.user?.name ?? "-");
 const isSuperadmin = computed(() => auth.role === "Superadmin");
+const canManageWaRules = computed(() =>
+  ["Superadmin", "SPV Deal Maker"].includes(auth.role),
+);
 
 /* ── Tab ── */
 const activeTab = ref("monitor");
@@ -2202,7 +2205,7 @@ async function saveSettings() {
 
 /* ── Fetch master pages ── */
 async function fetchPages() {
-  if (!isSuperadmin.value) return;
+  if (!canManageWaRules.value) return;
   loadingPages.value = true;
   try {
     const { data } = await axios.get(`${API_BASE}/wa-monitor/pages`);
@@ -2278,7 +2281,7 @@ async function deletePage(page) {
 
 /* ── Tag Trigger (auto-tag rules) ── */
 async function fetchAutoTagRules() {
-  if (!isSuperadmin.value) return;
+  if (!canManageWaRules.value) return;
   loadingRules.value = true;
   rulesError.value = "";
   try {
